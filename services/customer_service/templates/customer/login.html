@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer Login</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="auth-page">
+  <div class="promo-strip" aria-hidden="true">
+    <span>Get a 20% discount</span><span>USE CODE 20PD</span><span>Get a 20% discount</span><span>USE CODE 20PD</span>
+  </div>
+  <section class="auth-shell">
+    <article class="auth-card">
+      <span class="hero-tag">Customer Portal</span>
+      <h1>Welcome <em>Back</em></h1>
+      <p>Sign in to explore products, manage your cart, and complete orders.</p>
+      {% include 'partials/messages.html' %}
+      <form method="post" class="auth-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="cta-dark">Sign In</button>
+      </form>
+      <p class="auth-switch">No account yet? <a href="/customer/register/">Create one now</a></p>
+    </article>
+  </section>
+</body>
+</html>

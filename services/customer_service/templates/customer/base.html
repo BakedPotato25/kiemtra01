@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Customer Portal{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="store-body">
+  <div class="promo-strip" aria-hidden="true">
+    <span>Get a 20% discount</span>
+    <span>USE CODE 20PD</span>
+    <span>Get a 20% discount</span>
+    <span>USE CODE 20PD</span>
+    <span>Get a 20% discount</span>
+    <span>USE CODE 20PD</span>
+    <span>Get a 20% discount</span>
+    <span>USE CODE 20PD</span>
+  </div>
+
+  <header class="top-nav-wrap">
+    <div class="top-nav shell">
+      <a class="logo-mark" href="/customer/dashboard/" aria-label="Home">UN</a>
+      <nav class="menu-pill" aria-label="Main">
+        <a href="/customer/dashboard/#section-categories">Categories</a>
+        <a href="/customer/dashboard/#section-products">Products</a>
+        <a href="/customer/dashboard/#section-stories">Blogs</a>
+        <a href="/customer/dashboard/#section-newsletter">Newsletter</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="ghost-btn" href="/customer/cart/">Cart</a>
+        <a class="ghost-btn" href="/customer/saved/">Saved</a>
+        <a class="ghost-btn" href="/customer/orders/">Orders</a>
+        <a class="ghost-btn" href="/customer/compare/">Compare</a>
+        <a class="ghost-btn" href="/customer/logout/">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-wrap shell page-enter">
+    {% include 'partials/messages.html' %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% if request.user.is_authenticated and not request.user.is_staff and not request.user.is_superuser %}
+  {% include 'partials/chat_widget.html' with chatbot_current_product=chatbot_current_product %}
+  {% endif %}
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div>
+        <p class="footer-logo">UN Uncover</p>
+        <p class="footer-muted">Exploring tech and design shaping daily life.</p>
+      </div>
+      <div>
+        <p class="footer-title">Pages</p>
+        <a href="/customer/dashboard/">Home</a>
+        <a href="/customer/cart/">Cart</a>
+        <a href="/customer/saved/">Saved</a>
+        <a href="/customer/orders/">Orders</a>
+        <a href="/customer/compare/">Compare</a>
+      </div>
+      <div>
+        <p class="footer-title">Categories</p>
+        <a href="/customer/dashboard/?category=laptop">Laptop</a>
+        <a href="/customer/dashboard/?category=mobile">Mobile</a>
+        <a href="/customer/dashboard/?category=accessory">Accessory</a>
+        <a href="/customer/dashboard/?stock=in_stock">In Stock</a>
+      </div>
+      <div>
+        <p class="footer-title">Need Help</p>
+        <p class="footer-muted">Support: support@kiemtra01.local</p>
+      </div>
+    </div>
+    <div class="shell footer-copy">© 2026 Kiemtra01. All rights reserved.</div>
+  </footer>
+  <script src="/static/js/site.js"></script>
+</body>
+</html>

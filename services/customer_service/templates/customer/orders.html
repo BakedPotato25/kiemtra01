@@ -1,0 +1,61 @@
+{% extends 'customer/base.html' %}
+{% block title %}Order History{% endblock %}
+{% block content %}
+<section class="section-head cart-head">
+  <span>Orders</span>
+  <h1>Order <em>History</em></h1>
+  <p>Orders created at checkout stay pending until payment is completed.</p>
+</section>
+
+{% if orders %}
+<section class="orders-grid">
+  {% for order in orders %}
+  <article class="order-card">
+    <div class="order-top">
+      <div>
+        <h3>Order #{{ order.id }}</h3>
+        <p>{{ order.created_at }}</p>
+      </div>
+      <div class="order-status-wrap">
+        <span class="status-badge {% if order.status == 'paid' %}paid{% elif order.status == 'pending' %}pending{% else %}cancelled{% endif %}">{{ order.status|upper }}</span>
+      </div>
+    </div>
+    <p class="order-total">Total: <strong>${{ order.total_amount }}</strong></p>
+
+    {% if order.status == 'pending' %}
+    <form method="post" action="/customer/orders/{{ order.id }}/pay/" class="pay-form">
+      {% csrf_token %}
+      <button type="submit" class="cta-dark">Pay Now</button>
+    </form>
+    {% endif %}
+
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Service</th>
+          <th>Brand</th>
+          <th>Qty</th>
+          <th>Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in order.items.all %}
+        <tr>
+          <td>{{ item.product_name }}</td>
+          <td>{{ item.product_service|upper }}</td>
+          <td>{{ item.product_brand|default:'N/A' }}</td>
+          <td>{{ item.quantity }}</td>
+          <td>${{ item.unit_price }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="empty-state">You have no orders yet.</section>
+{% endif %}
+</section>
+{% endblock %}

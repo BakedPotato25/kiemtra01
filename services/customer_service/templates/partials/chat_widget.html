@@ -1,0 +1,68 @@
+<div class="assist-shell" data-assist-shell>
+  <button type="button" class="assist-fab" data-assist-toggle aria-label="Open assistant" aria-expanded="false" aria-controls="floating-assist-panel">
+    <span>Chat</span>
+  </button>
+
+  <section
+    id="floating-assist-panel"
+    class="assist-panel"
+    data-assist-panel
+    data-assist-panel-root
+    data-chat-endpoint="/customer/chatbot/reply/"
+    data-assist-storage-key="assist-history:user-{{ request.user.id|default:'anon' }}"
+    {% if chatbot_current_product %}
+    data-product-service="{{ chatbot_current_product.service }}"
+    data-product-id="{{ chatbot_current_product.id }}"
+    data-product-name="{{ chatbot_current_product.name }}"
+    data-product-brand="{{ chatbot_current_product.brand }}"
+    data-product-price="{{ chatbot_current_product.price }}"
+    {% endif %}
+  >
+    <header class="assist-head">
+      <div>
+        <p class="assist-head-kicker">AI Assistant</p>
+        <h3>{{ chatbot_title|default:'Store Assistant' }}</h3>
+        <p>{{ chatbot_subtitle|default:'Ask about products and availability.' }}</p>
+      </div>
+      <div class="assist-head-actions">
+        <button type="button" class="assist-clear" data-assist-clear aria-label="Clear chat history">Clear</button>
+        <button type="button" class="assist-close" data-assist-close aria-label="Close assistant">x</button>
+      </div>
+    </header>
+
+    <div class="assist-log" data-assist-log>
+      <article class="assist-msg assist-msg-assistant">
+        <p>
+          {% if chatbot_current_product %}
+          Ask me about this item, similar options, or what is in stock right now.
+          {% else %}
+          Ask about products on this website, budget options, or in-stock recommendations.
+          {% endif %}
+        </p>
+      </article>
+    </div>
+
+    <div class="assist-quick-row" data-assist-quick-row>
+      <button type="button" class="assist-quick-btn" data-assist-quick="Show me in-stock options under $1000.">Under $1000</button>
+      <button type="button" class="assist-quick-btn" data-assist-quick="What products are available on this store right now?">In Stock</button>
+      {% if chatbot_current_product %}
+      <button type="button" class="assist-quick-btn" data-assist-quick="Recommend products similar to this one.">Similar</button>
+      {% else %}
+      <button type="button" class="assist-quick-btn" data-assist-quick="Recommend laptops for study and coding.">Study Setup</button>
+      {% endif %}
+    </div>
+
+    <form class="assist-form" data-assist-form>
+      <input
+        type="text"
+        name="message"
+        data-assist-input
+        maxlength="500"
+        placeholder="Ask your question..."
+        autocomplete="off"
+        required
+      >
+      <button class="cta-dark" type="submit" data-assist-send>Send</button>
+    </form>
+  </section>
+</div>

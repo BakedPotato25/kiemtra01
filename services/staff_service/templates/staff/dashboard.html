@@ -1,0 +1,249 @@
+{% extends 'staff/base.html' %}
+{% block title %}Staff Dashboard{% endblock %}
+{% block content %}
+<section class="grid-two staff-dashboard-grid">
+  <article class="panel">
+    <h1>Create New Catalog Item</h1>
+    <p class="panel-subtitle">Use this form only for creating new products.</p>
+    <form method="post" class="item-form" id="create-item-form">
+      {% csrf_token %}
+      <input type="hidden" name="intent" value="create">
+      <input type="hidden" name="return_service" value="{{ selected_service }}">
+
+      <p>
+        <label for="{{ create_form.service.id_for_label }}">Service:</label>
+        {{ create_form.service }}
+      </p>
+      <p>
+        <label for="{{ create_form.name.id_for_label }}">Name:</label>
+        {{ create_form.name }}
+      </p>
+      <p>
+        <label for="{{ create_form.brand.id_for_label }}">Brand:</label>
+        {{ create_form.brand }}
+      </p>
+      <p>
+        <label for="{{ create_form.description.id_for_label }}">Description:</label>
+        {{ create_form.description }}
+      </p>
+      <p>
+        <label for="{{ create_form.image_url.id_for_label }}">Image url:</label>
+        {{ create_form.image_url }}
+      </p>
+      <p>
+        <label for="{{ create_form.price.id_for_label }}">Price:</label>
+        {{ create_form.price }}
+      </p>
+      <p>
+        <label for="{{ create_form.stock.id_for_label }}">Stock:</label>
+        {{ create_form.stock }}
+      </p>
+      <button type="submit">Create Item</button>
+    </form>
+
+    <hr class="panel-separator">
+
+    <h2>Edit Selected Item</h2>
+    <p id="edit-empty-note" class="panel-subtitle">Click a row (or Edit) on the right to load product data here.</p>
+    <form method="post" class="item-form" id="update-item-form">
+      {% csrf_token %}
+      <input type="hidden" name="intent" value="update">
+      <input type="hidden" name="return_service" value="{{ selected_service }}">
+      {{ update_form.product_id }}
+
+      <p>
+        <label for="{{ update_form.service.id_for_label }}">Service:</label>
+        {{ update_form.service }}
+      </p>
+      <p>
+        <label for="{{ update_form.name.id_for_label }}">Name:</label>
+        {{ update_form.name }}
+      </p>
+      <p>
+        <label for="{{ update_form.brand.id_for_label }}">Brand:</label>
+        {{ update_form.brand }}
+      </p>
+      <p>
+        <label for="{{ update_form.description.id_for_label }}">Description:</label>
+        {{ update_form.description }}
+      </p>
+      <p>
+        <label for="{{ update_form.image_url.id_for_label }}">Image url:</label>
+        {{ update_form.image_url }}
+      </p>
+      <p>
+        <label for="{{ update_form.price.id_for_label }}">Price:</label>
+        {{ update_form.price }}
+      </p>
+      <p>
+        <label for="{{ update_form.stock.id_for_label }}">Stock:</label>
+        {{ update_form.stock }}
+      </p>
+      <div class="table-actions-row">
+        <button type="submit">Update Item</button>
+        <button type="button" id="clear-edit-btn" class="table-btn">Clear</button>
+      </div>
+    </form>
+  </article>
+
+  <article class="panel">
+    <div class="staff-list-header">
+      <h2>Item List ({{ selected_service|upper }})</h2>
+      <div class="service-filter-row">
+        {% for filter_name in service_filters %}
+        <a
+          href="/staff/dashboard/?service={{ filter_name }}"
+          class="service-filter-chip {% if selected_service == filter_name %}active{% endif %}"
+        >
+          {{ filter_name|upper }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if items %}
+      <table class="staff-items-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Brand</th>
+            <th>Service</th>
+            <th>Image</th>
+            <th>Price</th>
+            <th>Stock</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr
+            class="staff-item-row"
+            data-row-editable
+            data-service="{{ item.service }}"
+            data-product-id="{{ item.id }}"
+            data-name="{{ item.name|escapejs }}"
+            data-brand="{{ item.brand|default:''|escapejs }}"
+            data-description="{{ item.description|default:''|escapejs }}"
+            data-image-url="{{ item.image_url|default:''|escapejs }}"
+            data-price="{{ item.price }}"
+            data-stock="{{ item.stock }}"
+          >
+            <td>{{ item.id }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ item.brand|default:'N/A' }}</td>
+            <td>{{ item.service|upper }}</td>
+            <td>
+              {% if item.image_url %}
+              <a href="{{ item.image_url }}" target="_blank" rel="noreferrer">Preview</a>
+              {% else %}
+              N/A
+              {% endif %}
+            </td>
+            <td>{{ item.price }}</td>
+            <td>{{ item.stock }}</td>
+            <td>
+              <div class="table-actions-row">
+                <button type="button" class="table-btn edit-trigger">Edit</button>
+                <form method="post" class="confirm-delete-form" data-product-name="{{ item.name|escapejs }}">
+                  {% csrf_token %}
+                  <input type="hidden" name="intent" value="delete">
+                  <input type="hidden" name="return_service" value="{{ selected_service }}">
+                  <input type="hidden" name="delete-service" value="{{ item.service }}">
+                  <input type="hidden" name="delete-product_id" value="{{ item.id }}">
+                  <button type="submit" class="table-btn danger">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No items found or product service is unavailable.</p>
+    {% endif %}
+  </article>
+</section>
+
+<script>
+  (function () {
+    const updateForm = document.getElementById("update-item-form");
+    const clearEditButton = document.getElementById("clear-edit-btn");
+    const emptyNote = document.getElementById("edit-empty-note");
+    const editRows = Array.from(document.querySelectorAll("[data-row-editable]"));
+    const editButtons = Array.from(document.querySelectorAll(".edit-trigger"));
+    const deleteForms = Array.from(document.querySelectorAll(".confirm-delete-form"));
+
+    const updateField = {
+      productId: document.getElementById("id_update-product_id"),
+      service: document.getElementById("id_update-service"),
+      name: document.getElementById("id_update-name"),
+      brand: document.getElementById("id_update-brand"),
+      description: document.getElementById("id_update-description"),
+      imageUrl: document.getElementById("id_update-image_url"),
+      price: document.getElementById("id_update-price"),
+      stock: document.getElementById("id_update-stock"),
+    };
+
+    const setUpdateFromRow = (row) => {
+      if (!row) {
+        return;
+      }
+      updateField.productId.value = row.dataset.productId || "";
+      updateField.service.value = row.dataset.service || "laptop";
+      updateField.name.value = row.dataset.name || "";
+      updateField.brand.value = row.dataset.brand || "";
+      updateField.description.value = row.dataset.description || "";
+      updateField.imageUrl.value = row.dataset.imageUrl || "";
+      updateField.price.value = row.dataset.price || "";
+      updateField.stock.value = row.dataset.stock || "0";
+
+      emptyNote.textContent = `Editing item #${row.dataset.productId} (${(row.dataset.service || "").toUpperCase()})`;
+      updateForm.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+
+    editButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        setUpdateFromRow(button.closest("tr"));
+      });
+    });
+
+    editRows.forEach((row) => {
+      row.addEventListener("click", (event) => {
+        if (event.target.closest("button") || event.target.closest("form") || event.target.closest("a")) {
+          return;
+        }
+        setUpdateFromRow(row);
+      });
+    });
+
+    deleteForms.forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        const productName = form.getAttribute("data-product-name") || "this product";
+        if (!window.confirm(`Delete ${productName}? This action cannot be undone.`)) {
+          event.preventDefault();
+        }
+      });
+    });
+
+    updateForm.addEventListener("submit", (event) => {
+      if (!updateField.productId.value) {
+        event.preventDefault();
+        window.alert("Please select a product from the table before updating.");
+        return;
+      }
+
+      if (!window.confirm("Confirm update for this product?")) {
+        event.preventDefault();
+      }
+    });
+
+    clearEditButton.addEventListener("click", () => {
+      updateForm.reset();
+      updateField.productId.value = "";
+      emptyNote.textContent = "Click a row (or Edit) on the right to load product data here.";
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer Register</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="auth-page">
+  <div class="promo-strip" aria-hidden="true">
+    <span>Get a 20% discount</span><span>USE CODE 20PD</span><span>Get a 20% discount</span><span>USE CODE 20PD</span>
+  </div>
+  <section class="auth-shell">
+    <article class="auth-card">
+      <span class="hero-tag">Create Account</span>
+      <h1>Start <em>Shopping</em></h1>
+      <p>Create your customer account with username, email, and password.</p>
+      {% include 'partials/messages.html' %}
+      <form method="post" class="auth-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="cta-dark">Create Account</button>
+      </form>
+      <p class="auth-switch">Already have an account? <a href="/customer/login/">Sign in</a></p>
+    </article>
+  </section>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{% extends 'customer/base.html' %}
+{% block title %}{{ blog_post.title }}{% endblock %}
+{% block content %}
+<article class="blog-detail" data-reveal>
+  <p class="story-meta">{{ blog_post.category }} - {{ blog_post.published_at }} - {{ blog_post.author }}</p>
+  <h1>{{ blog_post.title }}</h1>
+  <p class="blog-lead">{{ blog_post.excerpt }}</p>
+  <img loading="lazy" class="blog-hero" src="{{ blog_post.hero_image_url|default:'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1400&q=80' }}" alt="{{ blog_post.title }}">
+  <div class="blog-body">
+    <p>{{ blog_post.body }}</p>
+  </div>
+</article>
+
+<section class="products-section" data-reveal>
+  <div class="section-head">
+    <span>More Articles</span>
+    <h2>Keep <em>Reading</em></h2>
+  </div>
+  <div class="story-grid">
+    {% for post in related_posts %}
+    <article class="story-card" data-reveal>
+      <p class="story-meta">{{ post.category }} - {{ post.published_at }}</p>
+      <h3>{{ post.title }}</h3>
+      <p>{{ post.excerpt }}</p>
+      <a class="story-link" href="{% url 'customer_blog_detail' slug=post.slug %}">Read article</a>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

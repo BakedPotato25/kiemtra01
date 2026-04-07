@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff Register</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="staff-login-page">
+  <section class="login-card staff-login-card">
+    <h1>Create Staff Account</h1>
+    <p>Use username, email, and password to create a staff account.</p>
+    {% include 'partials/messages.html' %}
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Create Account</button>
+    </form>
+    <p class="auth-switch">Already registered? <a href="/staff/login/">Sign in</a></p>
+  </section>
+</body>
+</html>
