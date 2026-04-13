@@ -45,11 +45,17 @@
     <div class="assist-quick-row" data-assist-quick-row>
       <button type="button" class="assist-quick-btn" data-assist-quick="Show me in-stock options under $1000.">Under $1000</button>
       <button type="button" class="assist-quick-btn" data-assist-quick="What products are available on this store right now?">In Stock</button>
+      <button type="button" class="assist-quick-btn" data-assist-quick="/model gemma">Use Gemma</button>
+      <button type="button" class="assist-quick-btn" data-assist-quick="/model gemini">Use Gemini</button>
       {% if chatbot_current_product %}
       <button type="button" class="assist-quick-btn" data-assist-quick="Recommend products similar to this one.">Similar</button>
       {% else %}
       <button type="button" class="assist-quick-btn" data-assist-quick="Recommend laptops for study and coding.">Study Setup</button>
       {% endif %}
+    </div>
+
+    <div class="assist-quick-row">
+      <button type="button" class="assist-quick-btn" data-assist-quick="/model">Current Model</button>
     </div>
 
     <form class="assist-form" data-assist-form>

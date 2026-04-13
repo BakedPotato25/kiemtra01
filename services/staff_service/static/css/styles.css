@@ -158,6 +158,173 @@ button {
   align-items: start;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.order-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.time-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 14px;
+  flex-wrap: wrap;
+}
+
+.time-filter-chip {
+  text-decoration: none;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #f8fafc;
+  font-size: 0.8rem;
+}
+
+.time-filter-chip.active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.time-filter-note {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.stats-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.stats-card.warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.stats-label {
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.stats-value {
+  margin-top: 6px;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.chart-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fcfdff;
+}
+
+.chart-card h3 {
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+  color: #0f172a;
+}
+
+.bar-row {
+  margin-bottom: 10px;
+}
+
+.bar-row:last-child {
+  margin-bottom: 0;
+}
+
+.bar-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #334155;
+  margin-bottom: 5px;
+}
+
+.bar-track {
+  width: 100%;
+  height: 9px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transform-origin: left center;
+  animation: bar-grow 0.8s ease;
+}
+
+.bar-fill.service-laptop {
+  background: linear-gradient(90deg, #0ea5e9, #0284c7);
+}
+
+.bar-fill.service-mobile {
+  background: linear-gradient(90deg, #34d399, #10b981);
+}
+
+.bar-fill.service-accessory {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.bar-fill.trend-daily {
+  background: linear-gradient(90deg, #4f46e5, #6366f1);
+}
+
+.bar-fill.trend-weekly {
+  background: linear-gradient(90deg, #0ea5e9, #14b8a6);
+}
+
+.trend-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 90px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.trend-row:last-child {
+  margin-bottom: 0;
+}
+
+.trend-label,
+.trend-value {
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.trend-value {
+  text-align: right;
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 .staff-list-header {
   display: grid;
   gap: 10px;
@@ -228,6 +395,77 @@ button {
 
 .table-btn.danger:hover {
   background: #fecaca;
+}
+
+.compact-table th,
+.compact-table td {
+  font-size: 0.84rem;
+}
+
+.history-list-wrap {
+  display: grid;
+  gap: 12px;
+  max-height: 74vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.history-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fcfdff;
+}
+
+.history-block h3 {
+  margin-bottom: 8px;
+  font-size: 0.92rem;
+}
+
+.history-identity-note {
+  margin: -2px 0 8px;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.customer-search-form {
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.customer-search-form label {
+  font-size: 0.82rem;
+  color: #334155;
+}
+
+.customer-search-form input {
+  margin-top: 0;
+}
+
+.customer-pager-row {
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.table-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.customers-layout {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+}
+
+.customers-layout .panel {
+  min-width: 0;
+}
+
+.customers-layout .compact-table td,
+.customers-layout .compact-table th {
+  white-space: nowrap;
 }
 
 #id_update-product_id {
@@ -325,5 +563,29 @@ th, td {
 
   .grid-two {
     grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-search-form {
+    grid-template-columns: 1fr;
+  }
+
+  .customers-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .trend-row {
+    grid-template-columns: 62px 1fr 84px;
   }
 }

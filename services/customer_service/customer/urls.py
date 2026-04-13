@@ -3,6 +3,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("gateway/", views.gateway_dashboard_view, name="customer_gateway_dashboard"),
+    path("gateway/apis/", views.gateway_apis_view, name="customer_gateway_apis"),
     path("", views.home_view, name="customer_home"),
     path("customer/login/", views.customer_login_view, name="customer_login"),
     path("customer/register/", views.customer_register_view, name="customer_register"),
@@ -23,6 +25,7 @@ urlpatterns = [
     path("customer/cart/add/", views.add_to_cart_view, name="customer_add_to_cart"),
     path("customer/cart/remove/<int:item_id>/", views.remove_from_cart_view, name="customer_remove_from_cart"),
     path("customer/chatbot/reply/", views.chatbot_reply_view, name="customer_chatbot_reply"),
+    path("customer/staff/analytics/", views.staff_order_analytics_view, name="customer_staff_analytics"),
     path("customer/checkout/", views.checkout_view, name="customer_checkout"),
     path("customer/orders/", views.orders_view, name="customer_orders"),
     path("customer/orders/<int:order_id>/pay/", views.pay_order_view, name="customer_pay_order"),

@@ -1,5 +1,7 @@
 from decimal import Decimal, InvalidOperation
+from datetime import timedelta
 import json
+import os
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
@@ -8,16 +10,18 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.utils import timezone
+from django.views.decorators.http import require_POST, require_http_methods
 
 from .content import CATEGORY_SECTIONS, FAQ_ITEMS
 from .forms import CustomerLoginForm, CustomerRegisterForm, ProductFilterForm
 from .models import BlogPost, CartItem, CompareItem, Order, OrderItem, SavedItem, Testimonial
+from .api_gateway.registry import build_gateway_registry
 from .services import (
     fetch_product_detail,
     fetch_products,
-    generate_chatbot_response,
     get_available_brands,
+    request_chatbot_reply,
     recommend_products_for_detail,
 )
 
@@ -26,6 +30,16 @@ User = get_user_model()
 
 def _is_customer_user(user):
     return user.is_authenticated and not user.is_staff and not user.is_superuser
+
+
+def gateway_dashboard_view(request):
+    gateway_payload = build_gateway_registry(request)
+    return render(request, "customer/gateway_dashboard.html", {"gateway": gateway_payload})
+
+
+def gateway_apis_view(request):
+    gateway_payload = build_gateway_registry(request)
+    return JsonResponse(gateway_payload)
 
 
 def _safe_next_url(next_url, fallback):
@@ -191,6 +205,191 @@ def _build_user_context_payload(user):
     }
 
 
+def _decimal_to_str(value):
+    return f"{(value or Decimal('0')):.2f}"
+
+
+def _resolve_range_days(raw_value):
+    value = _safe_int(raw_value, 30)
+    if value in {7, 30, 90}:
+        return value
+    return 30
+
+
+def _format_datetime_short(value):
+    if value is None:
+        return None
+    return timezone.localtime(value).strftime("%Y-%m-%d %H:%M")
+
+
+def _build_staff_analytics_payload(customer_limit=200, recent_limit=20, range_days=30):
+    customers = list(
+        User.objects.filter(is_staff=False, is_superuser=False)
+        .order_by("id")[: max(1, customer_limit)]
+    )
+    customer_ids = [customer.id for customer in customers]
+    now = timezone.now()
+    start_time = now - timedelta(days=max(1, range_days))
+
+    customer_rows = {}
+    for customer in customers:
+        full_name = " ".join([customer.first_name or "", customer.last_name or ""]).strip()
+        display_name = full_name or customer.username
+        customer_rows[customer.id] = {
+            "user_id": customer.id,
+            "display_name": display_name,
+            "full_name": full_name,
+            "username": customer.username,
+            "email": customer.email or "",
+            "order_count": 0,
+            "paid_order_count": 0,
+            "total_units": 0,
+            "total_spent_value": Decimal("0"),
+            "last_order_at": None,
+            "recent_paid_orders": [],
+        }
+
+    orders = list(
+        Order.objects.filter(user_id__in=customer_ids, created_at__gte=start_time)
+        .select_related("user")
+        .prefetch_related("items")
+        .order_by("-created_at")
+    )
+
+    daily_revenue = {}
+    for offset in range(range_days - 1, -1, -1):
+        day = (now - timedelta(days=offset)).date()
+        daily_revenue[day] = Decimal("0")
+
+    weekly_revenue = {}
+    for day in daily_revenue:
+        week_start = day - timedelta(days=day.weekday())
+        weekly_revenue.setdefault(week_start, Decimal("0"))
+
+    total_orders = 0
+    paid_orders = 0
+    pending_orders = 0
+    cancelled_orders = 0
+    total_revenue = Decimal("0")
+    total_units_sold = 0
+    recent_orders = []
+
+    for order in orders:
+        total_orders += 1
+        order_total = order.total_amount or Decimal("0")
+        order_items = list(order.items.all())
+        order_units = sum(item.quantity for item in order_items)
+        total_units_sold += order_units
+
+        if order.status == Order.STATUS_PAID:
+            paid_orders += 1
+            total_revenue += order_total
+        elif order.status == Order.STATUS_PENDING:
+            pending_orders += 1
+        elif order.status == Order.STATUS_CANCELLED:
+            cancelled_orders += 1
+
+        customer_row = customer_rows.get(order.user_id)
+        if customer_row is not None:
+            customer_row["order_count"] += 1
+            if customer_row["last_order_at"] is None:
+                customer_row["last_order_at"] = _format_datetime_short(order.created_at)
+
+            if order.status == Order.STATUS_PAID:
+                customer_row["paid_order_count"] += 1
+                customer_row["total_units"] += order_units
+                customer_row["total_spent_value"] += order_total
+
+                order_day = timezone.localtime(order.created_at).date()
+                if order_day in daily_revenue:
+                    daily_revenue[order_day] += order_total
+                week_start = order_day - timedelta(days=order_day.weekday())
+                if week_start in weekly_revenue:
+                    weekly_revenue[week_start] += order_total
+
+                if len(customer_row["recent_paid_orders"]) < 5:
+                    customer_row["recent_paid_orders"].append(
+                        {
+                            "order_id": order.id,
+                            "created_at": _format_datetime_short(order.created_at),
+                            "total_amount": _decimal_to_str(order_total),
+                        }
+                    )
+
+        if len(recent_orders) < max(1, recent_limit):
+            preview_items = []
+            for item in order_items[:3]:
+                preview_items.append(f"{item.product_name} x{item.quantity}")
+
+            recent_orders.append(
+                {
+                    "order_id": order.id,
+                    "username": order.user.username,
+                    "display_name": customer_row.get("display_name") if customer_row else order.user.username,
+                    "status": order.status,
+                    "total_amount": _decimal_to_str(order_total),
+                    "total_units": order_units,
+                    "created_at": _format_datetime_short(order.created_at),
+                    "items_preview": ", ".join(preview_items),
+                }
+            )
+
+    finalized_rows = []
+    for row in customer_rows.values():
+        total_spent_value = row.pop("total_spent_value")
+        row["total_spent"] = _decimal_to_str(total_spent_value)
+        finalized_rows.append(row)
+
+    finalized_rows.sort(
+        key=lambda item: (
+            Decimal(item["total_spent"]),
+            item["order_count"],
+            item["username"].lower(),
+        ),
+        reverse=True,
+    )
+
+    avg_paid_order_value = total_revenue / paid_orders if paid_orders else Decimal("0")
+    active_customers = sum(1 for row in finalized_rows if row["order_count"] > 0)
+
+    daily_series = [
+        {
+            "label": day.strftime("%m-%d"),
+            "revenue": _decimal_to_str(amount),
+        }
+        for day, amount in daily_revenue.items()
+    ]
+    weekly_series = [
+        {
+            "label": f"Week {week_start.strftime('%m-%d')}",
+            "revenue": _decimal_to_str(amount),
+        }
+        for week_start, amount in weekly_revenue.items()
+    ]
+
+    return {
+        "customer_count": len(customers),
+        "active_customers": active_customers,
+        "range_days": range_days,
+        "range_start": start_time.date().isoformat(),
+        "range_end": now.date().isoformat(),
+        "order_stats": {
+            "total_orders": total_orders,
+            "paid_orders": paid_orders,
+            "pending_orders": pending_orders,
+            "cancelled_orders": cancelled_orders,
+            "total_revenue": _decimal_to_str(total_revenue),
+            "total_units_sold": total_units_sold,
+            "average_paid_order_value": _decimal_to_str(avg_paid_order_value),
+        },
+        "top_customers": finalized_rows[:8],
+        "customer_rows": finalized_rows,
+        "recent_orders": recent_orders,
+        "revenue_trend_daily": daily_series,
+        "revenue_trend_weekly": weekly_series,
+    }
+
+
 def home_view(request):
     if _is_customer_user(request.user):
         return redirect("customer_dashboard")
@@ -321,10 +520,11 @@ def chatbot_reply_view(request):
     current_product = _extract_current_product(payload)
     user_context = _build_user_context_payload(request.user)
 
-    result = generate_chatbot_response(
+    result = request_chatbot_reply(
         question=message,
         current_product=current_product,
         user_context=user_context,
+        user_ref=str(request.user.id),
         limit=5,
     )
 
@@ -356,6 +556,7 @@ def chatbot_reply_view(request):
             "source": result.get("source") or "rule_based",
             "fallback_used": bool(result.get("fallback_used")),
             "error_code": result.get("error_code"),
+            "provider": result.get("provider"),
         }
     )
 
@@ -685,3 +886,21 @@ def pay_order_view(request, order_id):
     order.save(update_fields=["status"])
     messages.success(request, f"Payment completed successfully for order #{order.id}.")
     return redirect("customer_orders")
+
+
+@require_http_methods(["GET"])
+def staff_order_analytics_view(request):
+    provided_key = (request.headers.get("X-Staff-Key") or "").strip()
+    expected_key = (os.getenv("STAFF_API_KEY") or "dev-staff-key").strip()
+    if provided_key != expected_key:
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
+    customer_limit = _safe_int(request.GET.get("customer_limit"), 200)
+    recent_limit = _safe_int(request.GET.get("recent_limit"), 20)
+    range_days = _resolve_range_days(request.GET.get("range_days"))
+    payload = _build_staff_analytics_payload(
+        customer_limit=max(20, min(1000, customer_limit)),
+        recent_limit=max(5, min(100, recent_limit)),
+        range_days=range_days,
+    )
+    return JsonResponse(payload)

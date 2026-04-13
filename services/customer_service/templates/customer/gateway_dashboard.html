@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gateway Control Room</title>
+  <style>
+    :root {
+      --bg: #f4f5ef;
+      --ink: #13120f;
+      --card: #fffef7;
+      --accent: #de5c2b;
+      --accent-soft: #ffeadf;
+      --line: #ddd7ca;
+      --muted: #6e685d;
+      --ok: #2f6b3f;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      background: radial-gradient(circle at 15% 10%, #fff9e7 0, var(--bg) 42%, #ece8dc 100%);
+      color: var(--ink);
+    }
+
+    .shell {
+      width: min(1120px, 94vw);
+      margin: 0 auto;
+      padding: 28px 0 42px;
+    }
+
+    .hero {
+      background: linear-gradient(130deg, #13120f 0%, #2f251d 48%, #4d2f22 100%);
+      color: #fff7ed;
+      border-radius: 20px;
+      padding: 26px;
+      box-shadow: 0 20px 40px rgba(30, 19, 14, 0.18);
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.5rem, 2.4vw, 2.2rem);
+      letter-spacing: 0.01em;
+    }
+
+    .hero p {
+      margin: 10px 0 0;
+      color: #f8d8c6;
+      max-width: 72ch;
+    }
+
+    .hero-links {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hero-links a {
+      display: inline-block;
+      text-decoration: none;
+      font-weight: 700;
+      color: #231108;
+      background: #ffd9c9;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 0.92rem;
+    }
+
+    .grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(23, 20, 15, 0.06);
+      overflow-x: auto;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1.08rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      font-size: 0.92rem;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.76rem;
+      letter-spacing: 0.06em;
+    }
+
+    .method {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      background: var(--accent-soft);
+      color: #7a2f14;
+      white-space: nowrap;
+    }
+
+    .ok {
+      color: var(--ok);
+      font-weight: 700;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.86rem;
+      word-break: break-word;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    @media (max-width: 880px) {
+      .shell { width: min(96vw, 1120px); }
+      .hero { border-radius: 14px; }
+      .card { border-radius: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <h1>Gateway Control Room</h1>
+      <p>Quan ly tat ca API Gateway mapping cua he thong microservices tren localhost. Trang nay duoc cap nhat tu folder customer/api_gateway khi web dang chay.</p>
+      <div class="hero-links">
+        <a href="{{ gateway.gateway_index_url }}">JSON index</a>
+        <a href="http://localhost:8000/customer/dashboard/">Customer app</a>
+        <a href="http://localhost:8003/staff/dashboard/">Staff app</a>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Service Endpoints</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Localhost URL</th>
+              <th>Internal Docker URL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for service_name, data in gateway.services.items %}
+            <tr>
+              <td><code>{{ service_name }}</code></td>
+              <td><a class="ok" href="{{ data.localhost }}" target="_blank" rel="noreferrer">{{ data.localhost }}</a></td>
+              <td><code>{{ data.internal }}</code></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <h2>Gateway Route Matrix</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Gateway</th>
+              <th>Method</th>
+              <th>Public Path</th>
+              <th>Public URL</th>
+              <th>Upstream</th>
+              <th>Upstream URLs</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for route in gateway.routes %}
+            <tr>
+              <td><code>{{ route.gateway }}</code></td>
+              <td><span class="method">{{ route.method }}</span></td>
+              <td><code>{{ route.public_path }}</code></td>
+              <td><code>{{ route.public_url }}</code></td>
+              <td><code>{{ route.upstream }}</code></td>
+              <td>
+                <ul>
+                  {% for upstream_url in route.upstream_urls %}
+                  <li><code>{{ upstream_url }}</code></li>
+                  {% endfor %}
+                </ul>
+              </td>
+              <td>{{ route.description }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </article>
+    </section>
+  </div>
+</body>
+</html>

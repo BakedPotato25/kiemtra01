@@ -78,9 +78,38 @@ services:
     ports:
       - "8004:8000"
 
+  chatbot_service:
+    build: ./services/chatbot_service
+    container_name: kiemtra01_chatbot
+    hostname: chatbot-service
+    restart: unless-stopped
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_ALLOWED_HOSTS: "*"
+      LAPTOP_SERVICE_URL: http://laptop-service:8000
+      MOBILE_SERVICE_URL: http://mobile-service:8000
+      ACCESSORY_SERVICE_URL: http://accessory-service:8000
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemma}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1/chat/completions}
+      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-}
+      OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-kiemtra01-chatbot}
+      GEMMA_MODEL: ${GEMMA_MODEL:-gemma-4-31b-it}
+      GEMMA_TIMEOUT_SECONDS: ${GEMMA_TIMEOUT_SECONDS:-45}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${CHATBOT_GEMINI_MODEL:-gemini-3.1-flash-lite-preview}
+      GEMINI_TIMEOUT_SECONDS: ${GEMINI_TIMEOUT_SECONDS:-35}
+    depends_on:
+      - laptop_service
+      - mobile_service
+      - accessory_service
+    ports:
+      - "8005:8000"
+
   customer_service:
     build: ./services/customer_service
     container_name: kiemtra01_customer
+    hostname: customer-service
     restart: unless-stopped
     environment:
       DJANGO_DEBUG: "1"
@@ -93,13 +122,13 @@ services:
       LAPTOP_SERVICE_URL: http://laptop-service:8000
       MOBILE_SERVICE_URL: http://mobile-service:8000
       ACCESSORY_SERVICE_URL: http://accessory-service:8000
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3-flash-preview}
+      CHATBOT_SERVICE_URL: http://chatbot-service:8000
     depends_on:
       - mysql
       - laptop_service
       - mobile_service
       - accessory_service
+      - chatbot_service
     ports:
       - "8000:8000"
 
@@ -118,12 +147,14 @@ services:
       LAPTOP_SERVICE_URL: http://laptop-service:8000
       MOBILE_SERVICE_URL: http://mobile-service:8000
       ACCESSORY_SERVICE_URL: http://accessory-service:8000
+      CUSTOMER_SERVICE_URL: http://customer-service:8000
       STAFF_API_KEY: ${STAFF_API_KEY:-dev-staff-key}
     depends_on:
       - mysql
       - laptop_service
       - mobile_service
       - accessory_service
+      - customer_service
     ports:
       - "8003:8000"
 
