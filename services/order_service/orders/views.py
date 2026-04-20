@@ -9,6 +9,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import CartItem, CompareItem, Order, OrderItem, OrderShipping, SavedItem
 
@@ -206,9 +207,7 @@ def _build_item_payload(payload):
     if not category_slug or product_id <= 0:
         return None
 
-    product_name = str(payload.get("product_name") or "").strip()[:255]
-    if not product_name:
-        return None
+    product_name = str(payload.get("product_name") or "").strip()[:255] or "Unknown Product"
     category_name = str(payload.get("category_name") or "").strip()[:120] or category_slug.replace("-", " ").title()
 
     return {
@@ -425,6 +424,7 @@ def _behavior_context_for_user(user_id):
     }
 
 
+@csrf_exempt
 @require_http_methods(["GET", "POST"])
 def cart_collection_view(request):
     auth_error = _require_internal_access(request)
@@ -468,6 +468,7 @@ def cart_collection_view(request):
     return JsonResponse({"created": created, "item": _serialize_cart_item(cart_item)}, status=201 if created else 200)
 
 
+@csrf_exempt
 @require_http_methods(["DELETE"])
 def cart_item_view(request, item_id):
     auth_error = _require_internal_access(request)
@@ -481,6 +482,7 @@ def cart_item_view(request, item_id):
     return JsonResponse({"status": "deleted"})
 
 
+@csrf_exempt
 @require_http_methods(["GET"])
 def saved_collection_view(request):
     auth_error = _require_internal_access(request)
@@ -493,6 +495,7 @@ def saved_collection_view(request):
     return JsonResponse({"items": [_serialize_saved_item(item) for item in items]})
 
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def saved_toggle_view(request):
     auth_error = _require_internal_access(request)
@@ -526,6 +529,7 @@ def saved_toggle_view(request):
     return JsonResponse({"action": "saved", "item": _serialize_saved_item(item)}, status=201)
 
 
+@csrf_exempt
 @require_http_methods(["GET"])
 def compare_collection_view(request):
     auth_error = _require_internal_access(request)
@@ -538,6 +542,7 @@ def compare_collection_view(request):
     return JsonResponse({"items": [_serialize_compare_item(item) for item in items]})
 
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def compare_toggle_view(request):
     auth_error = _require_internal_access(request)
@@ -575,6 +580,7 @@ def compare_toggle_view(request):
     return JsonResponse({"action": "added", "item": _serialize_compare_item(item)}, status=201)
 
 
+@csrf_exempt
 @require_http_methods(["DELETE"])
 def compare_item_view(request, item_id):
     auth_error = _require_internal_access(request)
@@ -588,6 +594,7 @@ def compare_item_view(request, item_id):
     return JsonResponse({"status": "deleted"})
 
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def checkout_view(request):
     auth_error = _require_internal_access(request)
@@ -639,6 +646,7 @@ def checkout_view(request):
     return JsonResponse({"order": _serialize_order(order)}, status=201)
 
 
+@csrf_exempt
 @require_http_methods(["GET"])
 def orders_collection_view(request):
     auth_error = _require_internal_access(request)
@@ -651,6 +659,7 @@ def orders_collection_view(request):
     return JsonResponse({"orders": [_serialize_order(order) for order in orders]})
 
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def pay_order_view(request, order_id):
     auth_error = _require_internal_access(request)
@@ -672,6 +681,7 @@ def pay_order_view(request, order_id):
     return JsonResponse({"order": _serialize_order(order)})
 
 
+@csrf_exempt
 @require_http_methods(["GET"])
 def staff_orders_view(request):
     auth_error = _require_internal_access(request)
@@ -691,6 +701,7 @@ def staff_orders_view(request):
     return JsonResponse({"orders": [_serialize_order(order) for order in orders]})
 
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def staff_shipping_update_view(request, order_id):
     auth_error = _require_internal_access(request)
@@ -710,6 +721,7 @@ def staff_shipping_update_view(request, order_id):
     return JsonResponse({"order": _serialize_order(order)})
 
 
+@csrf_exempt
 @require_http_methods(["GET"])
 def customer_analytics_view(request):
     auth_error = _require_internal_access(request)
@@ -727,6 +739,7 @@ def customer_analytics_view(request):
     )
 
 
+@csrf_exempt
 @require_http_methods(["GET"])
 def behavior_source_view(request):
     auth_error = _require_internal_access(request)

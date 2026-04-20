@@ -1,28 +1,40 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Customer Register</title>
-  <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body class="auth-page">
-  <div class="promo-strip" aria-hidden="true">
-    <span>Get a 20% discount</span><span>USE CODE 20PD</span><span>Get a 20% discount</span><span>USE CODE 20PD</span>
+{% extends 'customer/base.html' %}
+{% block title %}Create Account — Uncover{% endblock %}
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">UN <span style="color:var(--muted);font-weight:400;font-size:16px;">cover</span></div>
+    <h1>Create account</h1>
+    <p class="subtitle">Join Uncover to browse, save, and order tech devices.</p>
+
+    {% if form.non_field_errors %}
+    <div class="auth-error">{{ form.non_field_errors.0 }}</div>
+    {% endif %}
+    {% include 'partials/messages.html' %}
+
+    <form class="auth-form" method="post" action="/customer/register/" id="register-form">
+      {% csrf_token %}
+      <div class="auth-field">
+        <label for="id_username">Username</label>
+        {{ form.username }}
+        {% if form.username.errors %}<span style="color:var(--error);font-size:12px;">{{ form.username.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="auth-field">
+        <label for="id_email">Email address</label>
+        {{ form.email }}
+        {% if form.email.errors %}<span style="color:var(--error);font-size:12px;">{{ form.email.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="auth-field">
+        <label for="id_password">Password</label>
+        {{ form.password }}
+      </div>
+      <div class="auth-field">
+        <label for="id_confirm_password">Confirm password</label>
+        {{ form.confirm_password }}
+      </div>
+      <button type="submit" class="cta-green auth-submit" id="register-submit-btn">Create Account</button>
+    </form>
+    <p class="auth-switch">Already have an account? <a href="/customer/login/">Sign in</a></p>
   </div>
-  <section class="auth-shell">
-    <article class="auth-card">
-      <span class="hero-tag">Create Account</span>
-      <h1>Start <em>Shopping</em></h1>
-      <p>Create your customer account with username, email, and password.</p>
-      {% include 'partials/messages.html' %}
-      <form method="post" class="auth-form">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="cta-dark">Create Account</button>
-      </form>
-      <p class="auth-switch">Already have an account? <a href="/customer/login/">Sign in</a></p>
-    </article>
-  </section>
-</body>
-</html>
+</div>
+{% endblock %}

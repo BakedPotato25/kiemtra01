@@ -209,6 +209,9 @@ def rag_citations_from_docs(docs, limit=3):
         if doc.get("doc_type") == "product":
             detail = f"[{doc.get('category_slug')}] {doc.get('title') or 'N/A'}"
             label = "Product catalog"
+        elif doc.get("doc_type") == "graph":
+            detail = doc.get("title") or "Behavior graph"
+            label = "Behavior graph"
         else:
             detail = doc.get("title") or "FAQ"
             label = "FAQ"

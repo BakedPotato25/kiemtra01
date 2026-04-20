@@ -154,6 +154,33 @@ class OrderServiceTests(TestCase):
         )
         self.assertEqual(overflow.status_code, 400)
 
+    def test_internal_post_endpoints_do_not_require_browser_csrf_tokens(self):
+        client = self.client_class(enforce_csrf_checks=True)
+        client.defaults["HTTP_X_INTERNAL_KEY"] = "dev-order-internal-key"
+
+        cart_response = client.post(
+            "/api/cart/",
+            data=json.dumps(self._item_payload(product_id=201, product_name="Cart Item")),
+            content_type="application/json",
+        )
+        self.assertEqual(cart_response.status_code, 201)
+
+        saved_response = client.post(
+            "/api/saved/toggle/",
+            data=json.dumps(self._item_payload(product_id=202, product_name="Saved Item")),
+            content_type="application/json",
+        )
+        self.assertEqual(saved_response.status_code, 201)
+        self.assertEqual(saved_response.json()["action"], "saved")
+
+        compare_response = client.post(
+            "/api/compare/toggle/",
+            data=json.dumps(self._item_payload(product_id=203, product_name="Compare Item")),
+            content_type="application/json",
+        )
+        self.assertEqual(compare_response.status_code, 201)
+        self.assertEqual(compare_response.json()["action"], "added")
+
     def test_staff_shipping_requires_paid_order_and_valid_transition(self):
         order = self._checkout_order()
 

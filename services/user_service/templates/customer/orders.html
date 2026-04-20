@@ -1,62 +1,88 @@
 {% extends 'customer/base.html' %}
-{% block title %}Order History{% endblock %}
+{% block title %}Order History — Uncover{% endblock %}
 {% block content %}
-<section class="section-head cart-head">
-  <span>Orders</span>
+
+<div class="section-head">
+  <span class="section-tag">Orders</span>
   <h1>Order <em>History</em></h1>
-  <p>Track payment and shipping separately for every order.</p>
-</section>
+  <p>Track payment and shipping status for all your orders.</p>
+</div>
 
 {% if orders %}
-<section class="orders-grid">
+<div style="display:grid;gap:16px;margin-top:20px;" id="orders-list">
   {% for order in orders %}
-  <article class="order-card">
-    <div class="order-top">
+  <div class="order-card" id="order-card-{{ order.id }}">
+    <!-- Header -->
+    <div class="order-card-header">
       <div>
-        <h3>Order #{{ order.id }}</h3>
-        <p>{{ order.created_at }}</p>
+        <div class="order-id">#{{ order.id }}</div>
+        <div class="order-date">{{ order.created_at }}</div>
       </div>
-      <div class="order-status-wrap">
-        <span class="status-badge {% if order.payment_status == 'paid' %}paid{% elif order.payment_status == 'pending' %}pending{% else %}cancelled{% endif %}">PAYMENT {{ order.payment_status|upper }}</span>
-        <span class="status-badge {% if order.shipping_status == 'delivered' or order.shipping_status == 'shipped' %}paid{% elif order.shipping_status == 'pending' or order.shipping_status == 'preparing' %}pending{% else %}cancelled{% endif %}">SHIPPING {{ order.shipping_status|upper }}</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <span class="badge-status {% if order.payment_status == 'paid' %}badge-paid{% elif order.payment_status == 'pending' %}badge-pending{% else %}badge-cancelled{% endif %}">
+          💳 {{ order.payment_status|upper }}
+        </span>
+        <span class="badge-status {% if order.shipping_status == 'delivered' %}badge-delivered{% elif order.shipping_status == 'shipped' %}badge-shipped{% elif order.shipping_status == 'preparing' %}badge-preparing{% else %}badge-pending{% endif %}">
+          📦 {{ order.shipping_status|upper }}
+        </span>
+      </div>
+      <div class="order-total">${{ order.total_amount }}</div>
+    </div>
+
+    <!-- Shipping info -->
+    {% if order.shipping %}
+    <div style="padding:10px 20px;background:var(--surface-2);border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;">
+      <span>📍 {{ order.shipping.recipient_name }}, {{ order.shipping.phone }}</span>
+      <span>{{ order.shipping.address_line }}, {{ order.shipping.city_or_region }}, {{ order.shipping.postal_code }}, {{ order.shipping.country }}</span>
+      {% if order.shipping.note %}<span>📝 {{ order.shipping.note }}</span>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Pay button -->
+    {% if order.payment_status == 'pending' %}
+    <div style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.05);">
+      <form method="post" action="/customer/orders/{{ order.id }}/pay/" id="pay-form-{{ order.id }}">
+        {% csrf_token %}
+        <button type="submit" class="cta-green" id="pay-btn-{{ order.id }}" style="width:auto;">💳 Pay Now</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- Items table -->
+    <div class="order-items-wrap">
+      <div class="data-table-wrap" style="padding:0 20px 12px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Brand</th>
+              <th>Qty</th>
+              <th style="text-align:right;">Unit Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in order.items %}
+            <tr>
+              <td>{{ item.product_name }}</td>
+              <td>{{ item.category_name|default:item.category_slug|default:item.product_service|title }}</td>
+              <td>{{ item.product_brand|default:'N/A' }}</td>
+              <td>× {{ item.quantity }}</td>
+              <td style="text-align:right;color:var(--accent);font-weight:700;">${{ item.unit_price }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
-    <p class="order-total">Total: <strong>${{ order.total_amount }}</strong></p>
-
-    {% if order.shipping %}
-    <p><strong>Ship to:</strong> {{ order.shipping.recipient_name }}, {{ order.shipping.phone }}, {{ order.shipping.address_line }}, {{ order.shipping.city_or_region }}, {{ order.shipping.postal_code }}, {{ order.shipping.country }}</p>
-    {% if order.shipping.note %}
-    <p><strong>Note:</strong> {{ order.shipping.note }}</p>
-    {% endif %}
-    {% endif %}
-
-    {% if order.payment_status == 'pending' %}
-    <form method="post" action="/customer/orders/{{ order.id }}/pay/" class="pay-form">
-      {% csrf_token %}
-      <button type="submit" class="cta-dark">Pay Now</button>
-    </form>
-    {% endif %}
-
-    <table>
-      <thead>
-        <tr><th>Product</th><th>Category</th><th>Brand</th><th>Qty</th><th>Price</th></tr>
-      </thead>
-      <tbody>
-        {% for item in order.items %}
-        <tr>
-          <td>{{ item.product_name }}</td>
-          <td>{{ item.category_name|default:item.category_slug|default:item.product_service|title }}</td>
-          <td>{{ item.product_brand|default:'N/A' }}</td>
-          <td>{{ item.quantity }}</td>
-          <td>${{ item.unit_price }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </article>
+  </div>
   {% endfor %}
-</section>
+</div>
 {% else %}
-<section class="empty-state">You have no orders yet.</section>
+<div class="empty-state" style="margin-top:20px;text-align:center;">
+  <p style="font-size:32px;margin-bottom:12px;">📦</p>
+  <p>No orders placed yet.</p>
+  <a class="cta-green btn-lg" style="margin-top:16px;display:inline-flex;" href="/customer/cart/" id="orders-go-cart-btn">Go to Cart</a>
+</div>
 {% endif %}
 {% endblock %}

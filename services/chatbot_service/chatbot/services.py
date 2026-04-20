@@ -7,6 +7,7 @@ from pathlib import Path
 import requests
 
 from .behavior_ai import predict_behavior_for_user_ref, record_behavior_event
+from .behavior_graph import BehaviorGraphRetriever
 from .category_taxonomy import category_name_from_slug, detect_category_matches, fetch_catalog_categories
 from .content import FAQ_ITEMS
 from .rag_kb import rag_citations_from_docs, retrieve_rag_context
@@ -132,6 +133,101 @@ def _fetch_products(query_text="", category_slugs=None):
     return products
 
 
+def _fetch_product_by_id(product_id):
+    product_id = _to_int(product_id, 0)
+    if product_id <= 0:
+        return None
+
+    categories = _fetch_categories()
+    try:
+        response = requests.get(f"{_product_service_url()}/api/products/{product_id}/", timeout=5)
+        response.raise_for_status()
+        item = response.json()
+    except (requests.RequestException, ValueError):
+        return None
+
+    category_slug = str(item.get("category_slug") or "").strip().lower()
+    return {
+        "service": category_slug,
+        "category_slug": category_slug,
+        "category_name": item.get("category_name") or category_name_from_slug(category_slug, categories=categories),
+        "id": _to_int(item.get("id"), 0),
+        "name": item.get("name") or "N/A",
+        "brand": item.get("brand") or "",
+        "description": item.get("description") or "",
+        "price": str(item.get("price") or "0"),
+        "stock": _to_int(item.get("stock"), 0),
+        "image_url": item.get("image_url") or "",
+    }
+
+
+def _fetch_products_by_ids(product_ids, limit=6):
+    products = []
+    seen = set()
+    for product_id in product_ids[: max(1, limit)]:
+        normalized = _to_int(product_id, 0)
+        if normalized <= 0 or normalized in seen:
+            continue
+        seen.add(normalized)
+        product = _fetch_product_by_id(normalized)
+        if product:
+            products.append(product)
+    return products
+
+
+def _products_to_context_docs(products):
+    docs = []
+    for item in products:
+        category_slug = str(item.get("category_slug") or "").strip().lower()
+        product_id = _to_int(item.get("id"), 0)
+        if not category_slug or product_id <= 0:
+            continue
+        docs.append(
+            {
+                "doc_id": f"live_product:{category_slug}:{product_id}",
+                "doc_type": "product",
+                "service": "product_service_live",
+                "category_slug": category_slug,
+                "category_name": item.get("category_name") or category_name_from_slug(category_slug),
+                "product_id": product_id,
+                "title": item.get("name") or "N/A",
+                "text": (
+                    f"{item.get('name') or 'N/A'}. Category: {item.get('category_name') or category_name_from_slug(category_slug)}. "
+                    f"Brand: {item.get('brand') or ''}. Price: {item.get('price') or '0'}. "
+                    f"Stock: {item.get('stock') or 0}. Description: {item.get('description') or ''}"
+                ),
+                "url": f"/customer/products/{category_slug}/{product_id}/",
+                "brand": item.get("brand") or "",
+                "price": str(item.get("price") or "0"),
+                "stock": _to_int(item.get("stock"), 0),
+            }
+        )
+    return docs
+
+
+def _merge_context_docs(*doc_groups, limit=8):
+    merged = []
+    seen = set()
+    for docs in doc_groups:
+        for doc in docs or []:
+            if not isinstance(doc, dict):
+                continue
+            key = (
+                doc.get("doc_type"),
+                doc.get("category_slug"),
+                doc.get("product_id"),
+                doc.get("title"),
+                doc.get("url"),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(doc)
+            if len(merged) >= max(1, limit):
+                return merged
+    return merged
+
+
 def _preferred_categories(question, current_product=None, behavior_signal=None):
     categories = _fetch_categories()
     explicit = detect_category_matches(question, categories=categories)
@@ -167,7 +263,7 @@ def _candidate_products(question, preferred_categories):
     return unique
 
 
-def _score_product(product, question_tokens, current_product=None, preferred_categories=None, behavior_signal=None):
+def _score_product(product, question_tokens, current_product=None, preferred_categories=None, behavior_signal=None, boosted_product_ids=None):
     score = Decimal("0")
     if _to_int(product.get("stock"), 0) > 0:
         score += Decimal("2")
@@ -199,10 +295,12 @@ def _score_product(product, question_tokens, current_product=None, preferred_cat
         score += Decimal("0.8")
     if product.get("id") == _to_int(current_product.get("id"), -1):
         score -= Decimal("99")
+    if _to_int(product.get("id"), 0) in set(boosted_product_ids or []):
+        score += Decimal("1.6")
     return score
 
 
-def recommend_products(question, current_product=None, behavior_signal=None, limit=5):
+def recommend_products(question, current_product=None, behavior_signal=None, limit=5, boosted_product_ids=None):
     preferred = _preferred_categories(question, current_product=current_product, behavior_signal=behavior_signal)
     candidates = _candidate_products(question, preferred)
     tokens = _tokenize(question)
@@ -214,6 +312,7 @@ def recommend_products(question, current_product=None, behavior_signal=None, lim
                 current_product=current_product,
                 preferred_categories=preferred,
                 behavior_signal=behavior_signal,
+                boosted_product_ids=boosted_product_ids,
             ),
             product,
         )
@@ -491,12 +590,38 @@ def generate_chatbot_response(question, current_product=None, user_context=None,
         user_context=user_context,
     )
     preferred_categories = _preferred_categories(question, current_product=current_product, behavior_signal=behavior_signal)
-    recommendations = recommend_products(question, current_product=current_product, behavior_signal=behavior_signal, limit=limit)
+    graph_context = {"available": False, "status": "empty", "docs": [], "product_ids": [], "error": None}
+    graph_retriever = BehaviorGraphRetriever()
+    try:
+        graph_context = graph_retriever.fetch_context(
+            user_ref=user_ref,
+            category_slug=behavior_signal.get("dominant_category_slug") or (preferred_categories[0] if preferred_categories else ""),
+            current_product_id=_to_int(current_product.get("id"), 0),
+            limit=6,
+        )
+    finally:
+        graph_retriever.close()
+
+    live_context_products = _fetch_products_by_ids(graph_context.get("product_ids") or [], limit=6)
+    live_context_docs = _products_to_context_docs(live_context_products)
+    recommendations = recommend_products(
+        question,
+        current_product=current_product,
+        behavior_signal=behavior_signal,
+        limit=limit,
+        boosted_product_ids=graph_context.get("product_ids") or [],
+    )
     rag_docs = retrieve_rag_context(
         question=question,
         preferred_categories=preferred_categories,
         current_product=current_product,
         top_k=6,
+    )
+    context_docs = _merge_context_docs(
+        graph_context.get("docs") or [],
+        live_context_docs,
+        rag_docs,
+        limit=8,
     )
 
     language = "vi" if _looks_vietnamese(question) else "en"
@@ -505,7 +630,7 @@ def generate_chatbot_response(question, current_product=None, user_context=None,
         recommendations=recommendations,
         user_context=user_context,
         behavior_signal=behavior_signal,
-        rag_docs=rag_docs,
+        rag_docs=context_docs,
         language=language,
     )
 
@@ -516,7 +641,7 @@ def generate_chatbot_response(question, current_product=None, user_context=None,
             recommendations=recommendations,
             user_context=user_context,
             behavior_signal=behavior_signal,
-            rag_docs=rag_docs,
+            rag_docs=context_docs,
             language=language,
             compact=True,
         )
@@ -539,7 +664,7 @@ def generate_chatbot_response(question, current_product=None, user_context=None,
     return {
         "answer": answer,
         "recommendations": recommendations,
-        "citations": rag_citations_from_docs(rag_docs, limit=3),
+        "citations": rag_citations_from_docs(context_docs, limit=3),
         "source": source,
         "fallback_used": fallback_used,
         "error_code": error_code,

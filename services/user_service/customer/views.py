@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 
-from .api_gateway.registry import build_gateway_registry
+from .api_gateway import build_gateway_registry
 from .auth_rules import can_access_customer
 from .content import FAQ_ITEMS
 from .forms import CustomerLoginForm, CustomerRegisterForm, ProductFilterForm
@@ -18,6 +18,8 @@ from .models import BlogPost, Testimonial
 from .services import (
     DEFAULT_CATEGORY_HERO,
     add_to_cart,
+    build_cart_ai_suggestions,
+    build_dashboard_ai_suggestions,
     build_staff_analytics_payload,
     build_user_context_payload,
     category_choice_pairs,
@@ -48,7 +50,15 @@ def _is_customer_user(user):
 
 
 def gateway_dashboard_view(request):
-    return render(request, "customer/gateway_dashboard.html", {"gateway": build_gateway_registry(request)})
+    gateway = build_gateway_registry(request)
+    return render(
+        request,
+        "customer/gateway_dashboard.html",
+        {
+            "gateway": gateway,
+            "gateway_json": json.dumps(gateway),
+        },
+    )
 
 
 def gateway_apis_view(request):
@@ -168,11 +178,12 @@ def _parse_product_payload(request):
         return None
 
     category_name = (request.POST.get("category_name") or category_slug.replace("-", " ").title()).strip()[:120]
+    product_name = (request.POST.get("product_name", "") or "").strip()[:255] or "Unknown Product"
     return {
         "category_slug": category_slug,
         "category_name": category_name,
         "product_id": product_id,
-        "product_name": (request.POST.get("product_name", "") or "").strip()[:255],
+        "product_name": product_name,
         "product_brand": (request.POST.get("product_brand", "") or "").strip()[:120],
         "product_image_url": (request.POST.get("product_image_url", "") or "").strip(),
         "unit_price": price,
@@ -285,9 +296,18 @@ def customer_logout_view(request):
 def customer_dashboard_view(request):
     filter_form, filters, available_brands = _collect_filters(request)
     products = fetch_products(filters)
+    cart_items = list_cart_items(request.user.id)
+    saved_items = list_saved_items(request.user.id)
+    orders = list_orders(request.user.id)
+    user_context_payload = build_user_context_payload(
+        request.user.id,
+        cart_items=cart_items,
+        saved_items=saved_items,
+        orders=orders,
+    )
     saved_pairs = {
         (item.get("category_slug") or item.get("product_service"), item.get("product_id"))
-        for item in list_saved_items(request.user.id)
+        for item in saved_items
     }
     for product in products:
         product["is_saved"] = (product.get("category_slug"), _safe_int(product.get("id"), 0)) in saved_pairs
@@ -295,17 +315,31 @@ def customer_dashboard_view(request):
     product_page = Paginator(products, 9).get_page(request.GET.get("product_page") or 1)
     blog_page = Paginator(BlogPost.objects.all(), 3).get_page(request.GET.get("blog_page") or 1)
     best_sellers = sorted(fetch_products({"category": "all", "sort": "newest"}), key=lambda p: p.get("stock", 0), reverse=True)[:6]
+    dashboard_ai = build_dashboard_ai_suggestions(
+        request.user.id,
+        filters=filters,
+        products=products,
+        user_context=user_context_payload,
+        limit=4,
+    )
+    if dashboard_ai:
+        dashboard_ai = {
+            **dashboard_ai,
+            "badge": "AI Search Layer",
+            "title": "AI goi y cho ban",
+        }
 
     context = {
         "filter_form": filter_form,
         "products_page": product_page,
         "best_sellers": best_sellers,
         "available_brands": available_brands,
-        "cart_count": len(list_cart_items(request.user.id)),
+        "cart_count": len(cart_items),
         "filters": filters,
         "testimonials": Testimonial.objects.filter(is_featured=True)[:6],
         "blog_page": blog_page,
         "faq_items": FAQ_ITEMS,
+        "dashboard_ai": dashboard_ai,
         "product_prev_url": _dashboard_url(
             request,
             {"product_page": product_page.previous_page_number() if product_page.has_previous() else None},
@@ -547,10 +581,15 @@ def product_detail_view(request, category_slug, product_id):
 def cart_view(request):
     cart_items = list_cart_items(request.user.id)
     cart_total = sum(Decimal(str(item.get("total_price") or "0")) for item in cart_items)
+    cart_recommendations = build_cart_ai_suggestions(request.user.id, cart_items, limit=4) if cart_items else None
     return _render_customer(
         request,
         "customer/cart.html",
-        {"cart_items": cart_items, "cart_total": cart_total},
+        {
+            "cart_items": cart_items,
+            "cart_total": cart_total,
+            "cart_recommendations": cart_recommendations,
+        },
     )
 
 

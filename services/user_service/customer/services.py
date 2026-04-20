@@ -32,7 +32,7 @@ FALLBACK_CATEGORY_FIXTURES = [
         "slug": "ultrabooks",
         "name": "Ultrabooks",
         "description": "Lightweight premium laptops optimized for mobility, battery life, and clean design.",
-        "hero_image_url": "https://images.unsplash.com/photo-1517336714739-489689fd1ca8?auto=format&fit=crop&w=1400&q=80",
+        "hero_image_url": "https://images.unsplash.com/photo-1496171367470-9ed9a91ea931?auto=format&fit=crop&w=1400&q=80",
         "sort_order": 30,
     },
     {
@@ -85,6 +85,22 @@ FALLBACK_CATEGORY_FIXTURES = [
         "sort_order": 100,
     },
 ]
+COMPLEMENTARY_CATEGORY_HINTS = {
+    "business-laptops": ["chargers-cables", "bags-stands", "keyboards-mice", "audio"],
+    "gaming-laptops": ["audio", "keyboards-mice", "chargers-cables", "bags-stands"],
+    "ultrabooks": ["bags-stands", "chargers-cables", "keyboards-mice", "audio"],
+    "smartphones": ["chargers-cables", "audio", "smartwatches", "bags-stands"],
+    "tablets": ["chargers-cables", "audio", "bags-stands", "smartwatches"],
+    "smartwatches": ["smartphones", "audio", "chargers-cables"],
+    "audio": ["smartphones", "tablets", "chargers-cables", "bags-stands"],
+    "keyboards-mice": ["business-laptops", "gaming-laptops", "ultrabooks", "bags-stands"],
+    "chargers-cables": ["business-laptops", "smartphones", "tablets", "audio"],
+    "bags-stands": ["business-laptops", "ultrabooks", "tablets", "smartphones"],
+}
+CATEGORY_HERO_BY_SLUG = {
+    item["slug"]: item["hero_image_url"]
+    for item in FALLBACK_CATEGORY_FIXTURES
+}
 
 
 def _product_service_url():
@@ -131,13 +147,34 @@ def _safe_decimal(value, default=Decimal("0")):
         return default
 
 
+def category_image_fallback(category_slug):
+    return CATEGORY_HERO_BY_SLUG.get(str(category_slug or "").strip().lower(), DEFAULT_CATEGORY_HERO)
+
+
+def _resolved_image_urls(raw_image_url, category_slug):
+    fallback_url = category_image_fallback(category_slug)
+    image_url = str(raw_image_url or "").strip() or fallback_url
+    return image_url, fallback_url
+
+
 def _request_json(method, url, *, params=None, payload=None, headers=None, timeout=8):
+    def _json_ready(value):
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, dict):
+            return {key: _json_ready(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [_json_ready(item) for item in value]
+        if isinstance(value, tuple):
+            return [_json_ready(item) for item in value]
+        return value
+
     try:
         response = requests.request(
             method=method,
             url=url,
             params=params,
-            json=payload,
+            json=_json_ready(payload),
             headers=headers,
             timeout=timeout,
         )
@@ -177,6 +214,7 @@ def _category_matches_filter(category_slug, selected_category):
 def _normalize_product(item):
     category_slug = str(item.get("category_slug") or "").strip().lower()
     category_name = str(item.get("category_name") or "").strip()
+    image_url, image_fallback_url = _resolved_image_urls(item.get("image_url", ""), category_slug)
     return {
         "service": category_slug,
         "service_group": category_alias_for_slug(category_slug),
@@ -185,7 +223,8 @@ def _normalize_product(item):
         "id": item.get("id"),
         "name": item.get("name", "N/A"),
         "description": item.get("description", ""),
-        "image_url": item.get("image_url", ""),
+        "image_url": image_url,
+        "image_fallback_url": image_fallback_url,
         "brand": item.get("brand", ""),
         "price": str(item.get("price", "0")),
         "stock": _safe_int(item.get("stock"), 0),
@@ -203,7 +242,7 @@ def fetch_categories():
                     "slug": item["slug"],
                     "name": item["name"],
                     "description": item.get("description") or "",
-                    "hero_image_url": item.get("hero_image_url") or DEFAULT_CATEGORY_HERO,
+                    "hero_image_url": item.get("hero_image_url") or category_image_fallback(item.get("slug")),
                     "sort_order": _safe_int(item.get("sort_order"), 0),
                 }
                 for item in items
@@ -461,11 +500,15 @@ def export_behavior_source(max_users=300, max_events=1200, source_status="paid")
     return response["data"].get("records", []) if response["ok"] else []
 
 
-def build_user_context_payload(user_id):
-    cart_items = [item.get("product_name") for item in list_cart_items(user_id)[:6]]
-    saved_items = [item.get("product_name") for item in list_saved_items(user_id)[:6]]
+def build_user_context_payload(user_id, cart_items=None, saved_items=None, orders=None):
+    cart_items = cart_items if cart_items is not None else list_cart_items(user_id)
+    saved_items = saved_items if saved_items is not None else list_saved_items(user_id)
+    orders = orders if orders is not None else list_orders(user_id)
+
+    cart_names = [item.get("product_name") for item in cart_items[:6]]
+    saved_names = [item.get("product_name") for item in saved_items[:6]]
     recent_paid_items = []
-    for order in list_orders(user_id):
+    for order in orders:
         if order.get("payment_status") != "paid":
             continue
         for item in order.get("items", []):
@@ -477,8 +520,8 @@ def build_user_context_payload(user_id):
         if len(recent_paid_items) >= 8:
             break
     return {
-        "cart_items": cart_items[:4],
-        "saved_items": saved_items[:4],
+        "cart_items": cart_names[:4],
+        "saved_items": saved_names[:4],
         "recent_paid_items": recent_paid_items[:4],
     }
 
@@ -488,9 +531,23 @@ def request_chatbot_reply(question, current_product=None, user_context=None, use
     timeout_seconds = max(10, int(os.getenv("CHATBOT_REQUEST_TIMEOUT_SECONDS", "40") or "40"))
     retry_count = max(1, int(os.getenv("CHATBOT_REQUEST_RETRIES", "2") or "2"))
     endpoint = f"{base_url}/api/chat/reply/" if not base_url.endswith("/api/chat/reply") else f"{base_url}/"
+    sanitized_product = None
+    if isinstance(current_product, dict):
+        category_slug = str(current_product.get("category_slug") or current_product.get("service") or "").strip().lower()
+        product_id = _safe_int(current_product.get("id"), 0)
+        if category_slug and product_id > 0:
+            sanitized_product = {
+                "category_slug": category_slug,
+                "category_name": str(current_product.get("category_name") or category_slug.replace("-", " ").title()).strip(),
+                "service": category_slug,
+                "id": product_id,
+                "name": str(current_product.get("name") or "N/A").strip(),
+                "brand": str(current_product.get("brand") or "").strip(),
+                "price": str(current_product.get("price") or "0").strip(),
+            }
     payload = {
         "message": (question or "").strip(),
-        "current_product": current_product or None,
+        "current_product": sanitized_product,
         "user_context": user_context or {},
         "user_ref": str(user_ref or "").strip(),
         "limit": max(1, int(limit or 5)),
@@ -541,6 +598,236 @@ def request_chatbot_reply(question, current_product=None, user_context=None, use
         "fallback_used": bool(data.get("fallback_used")),
         "error_code": data.get("error_code"),
         "provider": data.get("provider"),
+    }
+
+
+def _normalize_recommendation_item(item):
+    category_slug = str(item.get("category_slug") or item.get("service") or item.get("product_service") or "").strip().lower()
+    product_id = _safe_int(item.get("id") or item.get("product_id"), 0)
+    if not category_slug or product_id <= 0:
+        return None
+
+    price_value = item.get("price", item.get("unit_price", item.get("total_price", "0")))
+    image_url, image_fallback_url = _resolved_image_urls(
+        item.get("image_url") or item.get("product_image_url") or "",
+        category_slug,
+    )
+    return {
+        "service": category_slug,
+        "category_slug": category_slug,
+        "category_name": item.get("category_name") or category_slug.replace("-", " ").title(),
+        "id": product_id,
+        "name": item.get("name") or item.get("product_name") or "N/A",
+        "brand": item.get("brand") or item.get("product_brand") or "",
+        "price": str(price_value or "0"),
+        "stock": _safe_int(item.get("stock"), 0),
+        "image_url": image_url,
+        "image_fallback_url": image_fallback_url,
+        "url": f"/customer/products/{category_slug}/{product_id}/",
+    }
+
+
+def _current_product_from_cart_item(item):
+    normalized = _normalize_recommendation_item(item)
+    if not normalized:
+        return None
+    return {
+        "category_slug": normalized["category_slug"],
+        "category_name": normalized["category_name"],
+        "service": normalized["service"],
+        "id": normalized["id"],
+        "name": normalized["name"],
+        "brand": normalized["brand"],
+        "price": normalized["price"],
+    }
+
+
+def _filter_summary_parts(filters):
+    filters = filters or {}
+    parts = []
+    if filters.get("q"):
+        parts.append(f"search '{filters['q']}'")
+    if filters.get("category") and filters.get("category") != "all":
+        parts.append(f"category {filters['category'].replace('-', ' ')}")
+    if filters.get("brand") and filters.get("brand") != "all":
+        parts.append(f"brand {filters['brand']}")
+    if filters.get("price_range") and filters.get("price_range") != "all":
+        parts.append(f"price {filters['price_range']}")
+    if filters.get("stock") == "in_stock":
+        parts.append("in stock only")
+    return parts
+
+
+def _dashboard_ai_question(filters, products):
+    parts = _filter_summary_parts(filters)
+    visible_names = [item.get("name") for item in products[:3] if item.get("name")]
+    scope = ", ".join(parts) if parts else "general shopping intent on the dashboard"
+    if visible_names:
+        return (
+            "Suggest 4 products from this store for my current dashboard search using "
+            f"{scope}. Visible matching products include {', '.join(visible_names)}. "
+            "Prioritize practical choices, in-stock items, and varied price points."
+        )
+    return (
+        "Suggest 4 products from this store for my current dashboard search using "
+        f"{scope}. Prioritize practical choices, in-stock items, and clear reasons."
+    )
+
+
+def _fallback_dashboard_recommendations(filters, products, limit=4):
+    recommendations = [_normalize_recommendation_item(item) for item in products[: max(1, limit)]]
+    recommendations = [item for item in recommendations if item]
+    parts = _filter_summary_parts(filters)
+    if parts:
+        summary = "These picks align with " + ", ".join(parts) + "."
+    else:
+        summary = "These picks reflect the strongest products for browsing the full catalog right now."
+    return {
+        "summary": summary,
+        "recommendations": recommendations,
+        "citations": [],
+        "source": "dashboard_local_fallback",
+        "fallback_used": True,
+        "provider": None,
+    }
+
+
+def build_dashboard_ai_suggestions(user_id, filters, products, user_context=None, limit=4):
+    products = products or []
+    if not products and not (filters or {}).get("q") and (filters or {}).get("category") in {None, "", "all"}:
+        return None
+
+    current_product = products[0] if products else None
+    result = request_chatbot_reply(
+        question=_dashboard_ai_question(filters or {}, products),
+        current_product=current_product,
+        user_context=user_context or build_user_context_payload(user_id),
+        user_ref=str(user_id),
+        limit=limit,
+    )
+    recommendations = [
+        normalized
+        for normalized in (_normalize_recommendation_item(item) for item in result.get("recommendations", []))
+        if normalized
+    ]
+    if not recommendations:
+        fallback = _fallback_dashboard_recommendations(filters or {}, products, limit=limit)
+        fallback["empty_state"] = not fallback["recommendations"]
+        return fallback
+
+    return {
+        "summary": result.get("answer") or "AI selected these products for your current search context.",
+        "recommendations": recommendations[: max(1, limit)],
+        "citations": result.get("citations") or [],
+        "source": result.get("source") or "chatbot_service",
+        "fallback_used": bool(result.get("fallback_used")),
+        "provider": result.get("provider"),
+        "empty_state": False,
+    }
+
+
+def _cart_ai_question(cart_items):
+    names = [item.get("product_name") for item in cart_items[:4] if item.get("product_name")]
+    categories = [
+        str(item.get("category_name") or item.get("category_slug") or item.get("product_service") or "").strip()
+        for item in cart_items[:4]
+    ]
+    name_text = ", ".join(names) if names else "my current items"
+    category_text = ", ".join(category for category in categories if category) or "my current categories"
+    return (
+        "Suggest 4 next-step or buy-together items for my cart. "
+        f"My cart currently has {name_text} across {category_text}. "
+        "Avoid duplicates of the exact same items and prioritize complementary products that still fit an e-commerce basket."
+    )
+
+
+def _fallback_cart_recommendations(cart_items, limit=4):
+    if not cart_items:
+        return {
+            "summary": "Add products to the cart to unlock AI buy-together suggestions.",
+            "recommendations": [],
+            "citations": [],
+            "source": "cart_local_fallback",
+            "fallback_used": True,
+            "provider": None,
+            "empty_state": True,
+        }
+
+    cart_product_ids = {_safe_int(item.get("product_id"), 0) for item in cart_items}
+    dominant_categories = []
+    for item in cart_items:
+        category_slug = str(item.get("category_slug") or item.get("product_service") or "").strip().lower()
+        if category_slug and category_slug not in dominant_categories:
+            dominant_categories.append(category_slug)
+
+    preferred_categories = []
+    for category_slug in dominant_categories:
+        for suggested_slug in COMPLEMENTARY_CATEGORY_HINTS.get(category_slug, []):
+            if suggested_slug not in preferred_categories:
+                preferred_categories.append(suggested_slug)
+
+    candidates = fetch_products({"category": "all", "sort": "newest"})
+    recommendations = []
+    for product in candidates:
+        normalized = _normalize_recommendation_item(product)
+        if not normalized or normalized["id"] in cart_product_ids:
+            continue
+        if preferred_categories and normalized["category_slug"] not in preferred_categories:
+            continue
+        recommendations.append(normalized)
+        if len(recommendations) >= max(1, limit):
+            break
+
+    if not recommendations:
+        for product in candidates:
+            normalized = _normalize_recommendation_item(product)
+            if not normalized or normalized["id"] in cart_product_ids:
+                continue
+            recommendations.append(normalized)
+            if len(recommendations) >= max(1, limit):
+                break
+
+    return {
+        "summary": "These add-on products complement the categories already in your cart.",
+        "recommendations": recommendations,
+        "citations": [],
+        "source": "cart_local_fallback",
+        "fallback_used": True,
+        "provider": None,
+        "empty_state": not recommendations,
+    }
+
+
+def build_cart_ai_suggestions(user_id, cart_items, user_context=None, limit=4):
+    if not cart_items:
+        return _fallback_cart_recommendations([], limit=limit)
+
+    result = request_chatbot_reply(
+        question=_cart_ai_question(cart_items),
+        current_product=_current_product_from_cart_item(cart_items[0]),
+        user_context=user_context or build_user_context_payload(user_id, cart_items=cart_items),
+        user_ref=str(user_id),
+        limit=limit,
+    )
+    cart_product_ids = {_safe_int(item.get("product_id"), 0) for item in cart_items}
+    recommendations = []
+    for item in result.get("recommendations", []):
+        normalized = _normalize_recommendation_item(item)
+        if not normalized or normalized["id"] in cart_product_ids:
+            continue
+        recommendations.append(normalized)
+
+    if not recommendations:
+        return _fallback_cart_recommendations(cart_items, limit=limit)
+
+    return {
+        "summary": result.get("answer") or "AI selected the strongest buy-together options for your current cart.",
+        "recommendations": recommendations[: max(1, limit)],
+        "citations": result.get("citations") or [],
+        "source": result.get("source") or "chatbot_service",
+        "fallback_used": bool(result.get("fallback_used")),
+        "provider": result.get("provider"),
+        "empty_state": False,
     }
 
 

@@ -7,6 +7,7 @@ This repo is a Docker-based Django commerce demo with 4 application services and
 - `product_service`: unified catalog API with 10 categories and 100 seeded demo products.
 - `order_service`: cart/saved/compare/order/shipping ownership, checkout/payment flow, order analytics, and legacy order import.
 - `chatbot_service`: chat reply, behavior ingest, category-affinity artifacts, RAG knowledge base, and PostgreSQL-backed behavior persistence.
+- `neo4j`: optional graph KB backing Phase 4/5 behavior-context queries for `chatbot_service`.
 
 ## Goals
 - Keep changes small and reviewable.
@@ -20,6 +21,7 @@ This repo is a Docker-based Django commerce demo with 4 application services and
 - Keep service URLs aligned with the Docker hostnames `user-service`, `product-service`, `order-service`, and `chatbot-service`.
 - Keep the cutover port map aligned with Docker Compose: `user_service` on `8000` and `8003`, `product_service` on `8001`, `order_service` internal-only on the Docker network, and `chatbot_service` on `8005`.
 - Keep chatbot artifacts file-based under `services/chatbot_service/chatbot/artifacts`.
+- Keep Neo4j wiring env-driven (`NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`) and isolated so customer, product, order, and chatbot startup still work without changing their public contracts.
 - Use `user_service`'s `backfill_chatbot_behavior` command as the primary recovery path for `BehaviorEvent`.
 - When changing models, add migrations and update `.env.example`, `docker-compose.yml`, `README.md`, and the relevant `AGENTS.md` files in the same change.
 

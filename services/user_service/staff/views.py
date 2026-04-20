@@ -1,13 +1,16 @@
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 
+import secrets
+import string
+
 import requests
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
-from django.shortcuts import redirect, render
-from django.views.decorators.http import require_http_methods
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_http_methods, require_POST
 
 from customer.services import (
     build_staff_analytics_payload,
@@ -18,7 +21,7 @@ from customer.services import (
     update_shipping_status,
 )
 from customer.auth_rules import can_access_staff
-from .forms import CreateItemForm, DeleteItemForm, StaffLoginForm, StaffRegisterForm, UpdateItemForm
+from .forms import CreateItemForm, CustomerEditForm, DeleteItemForm, StaffLoginForm, StaffRegisterForm, UpdateItemForm
 
 User = get_user_model()
 
@@ -312,7 +315,6 @@ def staff_items_view(request):
 
 @login_required
 @user_passes_test(_is_staff_user)
-@require_http_methods(["GET", "POST"])
 def staff_orders_view(request):
     if request.method == "POST":
         order_id = _to_int(request.POST.get("order_id"))
@@ -337,3 +339,90 @@ def staff_orders_view(request):
             "selected_payment_status": selected_payment,
         },
     )
+
+
+@login_required
+@user_passes_test(_is_staff_user)
+@require_http_methods(["GET"])
+def staff_customer_detail_view(request, user_id):
+    customer = get_object_or_404(User, id=user_id, is_staff=False, is_superuser=False)
+    analytics = build_staff_analytics_payload(customer_limit=500, recent_limit=50, range_days=90)
+    customer_row = next(
+        (row for row in analytics.get("customer_rows", []) if row.get("user_id") == user_id),
+        {},
+    )
+    customer_orders = [
+        order for order in analytics.get("recent_orders", []) if order.get("user_id") == user_id
+    ]
+    return render(
+        request,
+        "staff/customer_detail.html",
+        {
+            "customer": customer,
+            "customer_row": customer_row,
+            "customer_orders": customer_orders,
+        },
+    )
+
+
+@login_required
+@user_passes_test(_is_staff_user)
+@require_http_methods(["GET", "POST"])
+def staff_customer_edit_view(request, user_id):
+    customer = get_object_or_404(User, id=user_id, is_staff=False, is_superuser=False)
+    if request.method == "POST":
+        form = CustomerEditForm(request.POST, instance_user=customer)
+        if form.is_valid():
+            customer.first_name = form.cleaned_data["first_name"]
+            customer.last_name = form.cleaned_data["last_name"]
+            new_email = form.cleaned_data["email"]
+            new_username = form.cleaned_data["username"]
+            if new_email != customer.email and User.objects.filter(email__iexact=new_email).exclude(id=user_id).exists():
+                messages.error(request, "This email is already used by another account.")
+            elif new_username != customer.username and User.objects.filter(username__iexact=new_username).exclude(id=user_id).exists():
+                messages.error(request, "This username is already taken.")
+            else:
+                customer.email = new_email
+                customer.username = new_username
+                customer.save(update_fields=["first_name", "last_name", "email", "username"])
+                messages.success(request, f"Updated account for {customer.username}.")
+                return redirect("staff_customer_detail", user_id=user_id)
+    else:
+        form = CustomerEditForm(
+            instance_user=customer,
+            initial={
+                "username": customer.username,
+                "email": customer.email,
+                "first_name": customer.first_name,
+                "last_name": customer.last_name,
+            },
+        )
+    return render(request, "staff/customer_edit.html", {"customer": customer, "form": form})
+
+
+@login_required
+@user_passes_test(_is_staff_user)
+@require_POST
+def staff_customer_toggle_active_view(request, user_id):
+    customer = get_object_or_404(User, id=user_id, is_staff=False, is_superuser=False)
+    customer.is_active = not customer.is_active
+    customer.save(update_fields=["is_active"])
+    status_label = "activated" if customer.is_active else "deactivated"
+    messages.success(request, f"Account '{customer.username}' has been {status_label}.")
+    return redirect("staff_customer_detail", user_id=user_id)
+
+
+@login_required
+@user_passes_test(_is_staff_user)
+@require_POST
+def staff_customer_reset_password_view(request, user_id):
+    customer = get_object_or_404(User, id=user_id, is_staff=False, is_superuser=False)
+    alphabet = string.ascii_letters + string.digits
+    temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
+    customer.set_password(temp_password)
+    customer.save(update_fields=["password"])
+    messages.success(
+        request,
+        f"Password reset for '{customer.username}'. Temporary password: {temp_password} — share this once only.",
+    )
+    return redirect("staff_customer_detail", user_id=user_id)

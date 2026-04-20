@@ -44,7 +44,7 @@ CATEGORY_FIXTURES = [
         "name": "Ultrabooks",
         "slug": "ultrabooks",
         "description": "Lightweight premium laptops optimized for mobility, battery life, and clean design.",
-        "hero_image_url": "https://images.unsplash.com/photo-1517336714739-489689fd1ca8?auto=format&fit=crop&w=1400&q=80",
+        "hero_image_url": "https://images.unsplash.com/photo-1496171367470-9ed9a91ea931?auto=format&fit=crop&w=1400&q=80",
         "sort_order": 30,
         "products": [
             ("AirLite 13", "ASUS", "999.00", 25, "Thin ultrabook for students and consultants who travel often."),

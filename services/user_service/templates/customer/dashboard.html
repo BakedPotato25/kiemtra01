@@ -1,39 +1,43 @@
 {% extends 'customer/base.html' %}
-{% block title %}Customer Dashboard{% endblock %}
+{% block title %}Customer Dashboard — Uncover{% endblock %}
 {% block content %}
-<section class="hero-landing" data-reveal>
+
+<!-- Hero -->
+<section class="hero-landing" id="section-hero" data-reveal>
   <span class="hero-tag">Customer Portal</span>
   <h1>Find Your Next <em>Tech Upgrade</em></h1>
-  <p>Browse the unified catalog with cleaner filters, faster actions, and category-aware links.</p>
+  <p>Browse {{ products_page.paginator.count }} products across all categories with smart filters and AI picks.</p>
   <div class="hero-cta-row">
-    <a class="cta-dark" href="#section-products">Shop Products</a>
-    <a class="cta-light" href="/customer/cart/">Cart ({{ cart_count }})</a>
+    <a class="cta-green btn-lg" href="#section-products" id="hero-shop-btn">Shop Now</a>
+    <a class="cta-outline btn-lg" href="/customer/cart/" id="hero-cart-btn">Cart ({{ cart_count }})</a>
   </div>
 </section>
 
+<!-- Categories -->
 <section id="section-categories" class="category-grid-wrap" data-reveal>
-  <div class="section-head center">
-    <span>Categories</span>
+  <div class="section-head">
+    <span class="section-tag">Catalog</span>
     <h2>Browse by <em>Category</em></h2>
-    <p>Start with the category that fits your workflow.</p>
+    <p>10 curated categories across laptops, mobile, audio, and accessories.</p>
   </div>
   <div class="category-grid">
     {% for item in category_sections %}
     <article class="category-card">
       <h3>{{ item.title }}</h3>
       <p>{{ item.description }}</p>
-      <a href="/customer/dashboard/?category={{ item.query }}#section-products">View {{ item.title }}</a>
+      <a href="/customer/dashboard/?category={{ item.query }}#section-products" id="cat-link-{{ item.query }}">Browse {{ item.title }} →</a>
     </article>
     {% endfor %}
   </div>
 </section>
 
+<!-- Filters -->
 <section class="filters-wrap" data-reveal>
   <div class="section-head">
-    <span>Filters</span>
+    <span class="section-tag">Filter</span>
     <h2>Refine <em>Results</em></h2>
   </div>
-  <form class="filters-toolbar" method="get" action="/customer/dashboard/#section-products">
+  <form class="filters-toolbar" method="get" action="/customer/dashboard/#section-products" id="filter-form">
     <div class="field-group field-search">
       <label for="id_q">Search</label>
       {{ filter_form.q }}
@@ -58,52 +62,60 @@
       <label for="id_brand">Brand</label>
       {{ filter_form.brand }}
     </div>
-    <div class="field-actions">
-      <button class="cta-dark" type="submit">Apply</button>
-      <a class="cta-light" href="/customer/dashboard/#section-products">Reset</a>
+    <div class="field-actions" style="display:flex;gap:8px;align-items:end;">
+      <button class="cta-green" type="submit" id="filter-apply-btn">Apply</button>
+      <a class="cta-outline" href="/customer/dashboard/#section-products" id="filter-reset-btn">Reset</a>
     </div>
   </form>
-
   <div class="filters-active">
-    <strong>Active</strong>
-    {% if filters.q %}<span>Search: {{ filters.q }}</span>{% endif %}
-    {% if filters.category != 'all' %}<span>Category: {{ filters.category|title }}</span>{% endif %}
-    {% if filters.stock != 'all' %}<span>Stock: In stock</span>{% endif %}
-    {% if filters.price_range != 'all' %}<span>Price: {{ filters.price_range }}</span>{% endif %}
-    {% if filters.brand != 'all' %}<span>Brand: {{ filters.brand }}</span>{% endif %}
-    {% if filters.sort != 'newest' %}<span>Sort: {{ filters.sort }}</span>{% endif %}
+    <strong>Active:</strong>
+    {% if filters.q %}<span class="filter-chip">Search: {{ filters.q }}</span>{% endif %}
+    {% if filters.category != 'all' %}<span class="filter-chip">Category: {{ filters.category|title }}</span>{% endif %}
+    {% if filters.stock != 'all' %}<span class="filter-chip">In Stock Only</span>{% endif %}
+    {% if filters.price_range != 'all' %}<span class="filter-chip">Price: {{ filters.price_range }}</span>{% endif %}
+    {% if filters.brand != 'all' %}<span class="filter-chip">Brand: {{ filters.brand }}</span>{% endif %}
+    {% if filters.sort != 'newest' %}<span class="filter-chip">Sort: {{ filters.sort }}</span>{% endif %}
     {% if not filters.q and filters.category == 'all' and filters.stock == 'all' and filters.price_range == 'all' and filters.brand == 'all' and filters.sort == 'newest' %}
-    <span>Default results</span>
+    <span class="filter-chip" style="opacity:.5;">Default filters</span>
     {% endif %}
   </div>
 </section>
 
+<!-- Products -->
 <section id="section-products" class="products-section" data-reveal>
-  <div class="section-head">
-    <span>Products</span>
-    <h2>Fresh Picks Across <em>All Categories</em></h2>
-    <p>Page {{ products_page.number }} of {{ products_page.paginator.num_pages }}</p>
+  <div class="section-head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
+    <div>
+      <span class="section-tag">Products</span>
+      <h2>Fresh Picks <em>{{ products_page.number }}/{{ products_page.paginator.num_pages }}</em></h2>
+    </div>
+    <span style="color:var(--muted);font-size:13px;">{{ products_page.paginator.count }} results</span>
   </div>
 
+  {% if dashboard_ai %}
+  {% include 'partials/ai_suggestion_block.html' with ai_block=dashboard_ai %}
+  {% endif %}
+
   {% if products_page.object_list %}
-  <div class="product-grid">
+  <div class="product-grid" id="product-grid">
     {% for product in products_page.object_list %}
     <article class="store-card" data-reveal>
-      <a class="product-image" href="/customer/products/{{ product.category_slug }}/{{ product.id }}/">
+      <a class="product-image" href="/customer/products/{{ product.category_slug }}/{{ product.id }}/" id="product-img-{{ product.id }}">
         <span class="product-service">{{ product.category_name|default:product.category_slug|title }}</span>
-        <img loading="lazy" src="{{ product.image_url|default:'https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&w=1200&q=80' }}" alt="{{ product.name }}">
+        <img loading="lazy" src="{{ product.image_url }}" data-fallback-src="{{ product.image_fallback_url }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc;" alt="{{ product.name }}">
       </a>
       <div class="product-meta">
         <h3>{{ product.name }}</h3>
-        <p>{{ product.brand|default:'Generic Brand' }} | {{ product.category_name|default:product.category_slug|title }}</p>
-        <p>{{ product.description|truncatechars:96 }}</p>
+        <p>{{ product.brand|default:'Generic Brand' }}</p>
+        <p style="font-size:12px;color:var(--dim);">{{ product.description|truncatechars:80 }}</p>
       </div>
       <div class="price-row">
         <strong>${{ product.price }}</strong>
-        <span>Stock: {{ product.stock }}</span>
+        <span class="{% if product.stock == 0 %}stock-out{% elif product.stock <= 5 %}stock-low{% else %}stock-ok{% endif %}">
+          {% if product.stock == 0 %}Out of stock{% elif product.stock <= 5 %}Only {{ product.stock }} left{% else %}{{ product.stock }} in stock{% endif %}
+        </span>
       </div>
 
-      <form class="add-form" method="post" action="/customer/cart/add/">
+      <form class="add-form" method="post" action="/customer/cart/add/" id="cart-form-{{ product.id }}">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.get_full_path }}#section-products">
         <input type="hidden" name="category_slug" value="{{ product.category_slug }}">
@@ -114,11 +126,13 @@
         <input type="hidden" name="product_image_url" value="{{ product.image_url }}">
         <input type="hidden" name="unit_price" value="{{ product.price }}">
         <input type="hidden" name="stock" value="{{ product.stock }}">
-        <button type="submit" class="cta-dark">Add To Cart</button>
+        <button type="submit" class="cta-green" id="add-cart-{{ product.id }}" {% if product.stock == 0 %}disabled style="opacity:.4;"{% endif %}>
+          🛒 Add to Cart
+        </button>
       </form>
 
       <div class="card-actions-row">
-        <form class="add-form-inline" method="post" action="/customer/saved/toggle/">
+        <form class="add-form-inline" method="post" action="/customer/saved/toggle/" id="save-form-{{ product.id }}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}#section-products">
           <input type="hidden" name="category_slug" value="{{ product.category_slug }}">
@@ -129,9 +143,11 @@
           <input type="hidden" name="product_image_url" value="{{ product.image_url }}">
           <input type="hidden" name="unit_price" value="{{ product.price }}">
           <input type="hidden" name="stock" value="{{ product.stock }}">
-          <button class="cta-light" type="submit">{% if product.is_saved %}Saved{% else %}Save{% endif %}</button>
+          <button class="cta-light" type="submit" id="save-btn-{{ product.id }}">
+            {% if product.is_saved %}♥ Saved{% else %}♡ Save{% endif %}
+          </button>
         </form>
-        <form class="add-form-inline" method="post" action="/customer/compare/toggle/">
+        <form class="add-form-inline" method="post" action="/customer/compare/toggle/" id="compare-form-{{ product.id }}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}#section-products">
           <input type="hidden" name="category_slug" value="{{ product.category_slug }}">
@@ -142,11 +158,11 @@
           <input type="hidden" name="product_image_url" value="{{ product.image_url }}">
           <input type="hidden" name="unit_price" value="{{ product.price }}">
           <input type="hidden" name="stock" value="{{ product.stock }}">
-          <button class="cta-light" type="submit">Compare</button>
+          <button class="cta-light" type="submit" id="compare-btn-{{ product.id }}">⚖ Compare</button>
         </form>
       </div>
 
-      <a class="cta-light details-btn" href="/customer/products/{{ product.category_slug }}/{{ product.id }}/">View Details</a>
+      <a class="cta-outline details-btn" href="/customer/products/{{ product.category_slug }}/{{ product.id }}/" id="detail-btn-{{ product.id }}">View Details</a>
     </article>
     {% endfor %}
   </div>
@@ -154,37 +170,32 @@
   {% if products_page.has_other_pages %}
   <nav class="pager" aria-label="Products pagination">
     {% if products_page.has_previous %}
-    <a class="cta-light" href="{{ product_prev_url }}">Previous</a>
-    {% else %}
-    <span class="pager-disabled">Previous</span>
-    {% endif %}
+    <a class="cta-outline btn-sm" href="{{ product_prev_url }}" id="products-prev-btn">← Prev</a>
+    {% else %}<span class="pager-disabled">← Prev</span>{% endif %}
     <span class="pager-current">Page {{ products_page.number }} / {{ products_page.paginator.num_pages }}</span>
     {% if products_page.has_next %}
-    <a class="cta-light" href="{{ product_next_url }}">Next</a>
-    {% else %}
-    <span class="pager-disabled">Next</span>
-    {% endif %}
+    <a class="cta-outline btn-sm" href="{{ product_next_url }}" id="products-next-btn">Next →</a>
+    {% else %}<span class="pager-disabled">Next →</span>{% endif %}
   </nav>
   {% endif %}
 
   {% else %}
-  <section class="empty-state">
-    No products matched your filters. Try broadening your search.
-  </section>
+  <div class="empty-state">No products matched your filters. Try broadening your search or resetting filters.</div>
   {% endif %}
 </section>
 
+<!-- Best Sellers -->
 <section class="content-block" data-reveal>
   <div class="section-head">
-    <span>Best Sellers</span>
-    <h2>Top Picks This <em>Week</em></h2>
+    <span class="section-tag">Top Picks</span>
+    <h2>Best <em>Sellers</em></h2>
   </div>
   <div class="product-grid best-seller-grid">
     {% for product in best_sellers %}
     <article class="store-card compact-card" data-reveal>
-      <a class="product-image mini-image" href="/customer/products/{{ product.category_slug }}/{{ product.id }}/">
+      <a class="product-image mini-image" href="/customer/products/{{ product.category_slug }}/{{ product.id }}/" id="best-img-{{ product.id }}">
         <span class="product-service">{{ product.category_name|default:product.category_slug|title }}</span>
-        <img loading="lazy" src="{{ product.image_url|default:'https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&w=1200&q=80' }}" alt="{{ product.name }}">
+        <img loading="lazy" src="{{ product.image_url }}" data-fallback-src="{{ product.image_fallback_url }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc;" alt="{{ product.name }}">
       </a>
       <div class="product-meta">
         <h3>{{ product.name }}</h3>
@@ -192,57 +203,55 @@
       </div>
       <div class="price-row">
         <strong>${{ product.price }}</strong>
-        <span>Stock: {{ product.stock }}</span>
+        <span>{{ product.stock }} in stock</span>
       </div>
-      <a class="cta-light" href="/customer/products/{{ product.category_slug }}/{{ product.id }}/">Quick View</a>
+      <a class="cta-light btn-sm" href="/customer/products/{{ product.category_slug }}/{{ product.id }}/" id="best-view-{{ product.id }}">Quick View →</a>
     </article>
     {% endfor %}
   </div>
 </section>
 
+<!-- Blog -->
 <section id="section-stories" class="content-block" data-reveal>
   <div class="section-head center">
-    <span>Stories</span>
+    <span class="section-tag">Stories</span>
     <h2>Latest <em>Blog Posts</em></h2>
+    <p>Tech insights, buying guides, and product deep dives.</p>
   </div>
-
   {% if blog_page.object_list %}
   <div class="story-grid">
     {% for blog in blog_page.object_list %}
     <article class="story-card" data-reveal>
-      <img loading="lazy" class="story-image" src="{{ blog.hero_image_url|default:'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1400&q=80' }}" alt="{{ blog.title }}">
-      <p class="story-meta">{{ blog.category }} | {{ blog.published_at }} | {{ blog.author }}</p>
-      <h3>{{ blog.title }}</h3>
-      <p>{{ blog.excerpt }}</p>
-      <a class="story-link" href="/customer/blog/{{ blog.slug }}/">Read Article</a>
+      <img loading="lazy" class="story-image" src="{{ blog.hero_image_url|default:'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=800&q=80' }}" alt="{{ blog.title }}">
+      <div class="story-body">
+        <p class="story-meta">{{ blog.category }} · {{ blog.published_at }} · {{ blog.author }}</p>
+        <h3>{{ blog.title }}</h3>
+        <p>{{ blog.excerpt }}</p>
+        <a class="story-link" href="/customer/blog/{{ blog.slug }}/" id="blog-link-{{ blog.id }}">Read Article →</a>
+      </div>
     </article>
     {% endfor %}
   </div>
-
   {% if blog_page.has_other_pages %}
   <nav class="pager" aria-label="Blog pagination">
     {% if blog_page.has_previous %}
-    <a class="cta-light" href="{{ blog_prev_url }}">Previous</a>
-    {% else %}
-    <span class="pager-disabled">Previous</span>
-    {% endif %}
+    <a class="cta-outline btn-sm" href="{{ blog_prev_url }}" id="blog-prev-btn">← Prev</a>
+    {% else %}<span class="pager-disabled">← Prev</span>{% endif %}
     <span class="pager-current">Page {{ blog_page.number }} / {{ blog_page.paginator.num_pages }}</span>
     {% if blog_page.has_next %}
-    <a class="cta-light" href="{{ blog_next_url }}">Next</a>
-    {% else %}
-    <span class="pager-disabled">Next</span>
-    {% endif %}
+    <a class="cta-outline btn-sm" href="{{ blog_next_url }}" id="blog-next-btn">Next →</a>
+    {% else %}<span class="pager-disabled">Next →</span>{% endif %}
   </nav>
   {% endif %}
-
   {% else %}
-  <section class="empty-state">No blog posts are available yet.</section>
+  <div class="empty-state">No blog posts available yet.</div>
   {% endif %}
 </section>
 
+<!-- Testimonials -->
 <section class="content-block" data-reveal>
   <div class="section-head center">
-    <span>Testimonials</span>
+    <span class="section-tag">Social Proof</span>
     <h2>What Customers <em>Say</em></h2>
   </div>
   {% if testimonials %}
@@ -252,23 +261,26 @@
       <div class="testimonial-top">
         <img loading="lazy" class="testimonial-avatar" src="{{ item.avatar_url|default:'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?auto=format&fit=crop&w=300&q=80' }}" alt="{{ item.name }}">
         <div>
-          <h3>{{ item.name }}</h3>
-          <p>{{ item.role }}</p>
+          <p class="testimonial-name">{{ item.name }}</p>
+          <p class="testimonial-role">{{ item.role }}</p>
         </div>
       </div>
-      <p class="stars">{{ item.stars }}</p>
-      <p>{{ item.quote }}</p>
+      <div class="testimonial-body">
+        <p class="stars">{{ item.stars }}</p>
+        <p class="testimonial-quote">{{ item.quote }}</p>
+      </div>
     </article>
     {% endfor %}
   </div>
   {% else %}
-  <section class="empty-state">No testimonials available yet.</section>
+  <div class="empty-state">No testimonials yet.</div>
   {% endif %}
 </section>
 
+<!-- FAQ -->
 <section id="section-faq" class="content-block" data-reveal>
   <div class="section-head center">
-    <span>FAQ</span>
+    <span class="section-tag">FAQ</span>
     <h2>Frequently Asked <em>Questions</em></h2>
   </div>
   <div class="faq-grid">
@@ -281,16 +293,17 @@
   </div>
 </section>
 
+<!-- Newsletter -->
 <section id="section-newsletter" class="newsletter-block" data-reveal>
-  <div class="section-head center">
-    <span>Newsletter</span>
+  <span class="section-tag">Stay in the Loop</span>
+  <div class="section-head center" style="margin-top:12px;">
     <h2>Get Weekly <em>Tech Picks</em></h2>
-    <p>Receive curated recommendations across the full product catalog.</p>
+    <p>Curated recommendations across all categories, direct to your inbox.</p>
   </div>
-  <form class="newsletter-form" onsubmit="return false;">
-    <label for="newsletter-email">Email Address</label>
+  <form class="newsletter-form" onsubmit="return false;" id="newsletter-form">
     <input id="newsletter-email" type="email" placeholder="you@example.com" required>
-    <button class="cta-dark" type="submit">Subscribe</button>
+    <button class="cta-green" type="submit" id="newsletter-submit-btn">Subscribe</button>
   </form>
 </section>
+
 {% endblock %}
