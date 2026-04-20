@@ -1,0 +1,64 @@
+{% extends 'staff/base.html' %}
+{% block title %}Staff Orders{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Order Shipping Management</h1>
+  <p class="panel-subtitle">Review payment/shipping status and update shipping progression for customer orders.</p>
+
+  {% if orders %}
+  <table class="staff-items-table">
+    <thead>
+      <tr>
+        <th>Order</th>
+        <th>User</th>
+        <th>Payment</th>
+        <th>Shipping</th>
+        <th>Total</th>
+        <th>Ship To</th>
+        <th>Items</th>
+        <th>Update</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+      <tr>
+        <td>#{{ order.id }}<br><small>{{ order.created_at }}</small></td>
+        <td>{{ order.user_id }}</td>
+        <td>{{ order.payment_status|upper }}</td>
+        <td>{{ order.shipping_status|upper }}</td>
+        <td>${{ order.total_amount }}</td>
+        <td>
+          {% if order.shipping %}
+          {{ order.shipping.recipient_name }}<br>
+          {{ order.shipping.phone }}<br>
+          {{ order.shipping.city_or_region }}, {{ order.shipping.country }}
+          {% else %}
+          N/A
+          {% endif %}
+        </td>
+        <td>
+          {% for item in order.items %}
+          <div>{{ item.product_name }} x{{ item.quantity }}</div>
+          {% endfor %}
+        </td>
+        <td>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="order_id" value="{{ order.id }}">
+            <select name="shipping_status">
+              {% for value, label in shipping_status_choices %}
+              <option value="{{ value }}" {% if order.shipping_status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="table-btn">Update</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No orders available yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

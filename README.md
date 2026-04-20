@@ -1,305 +1,200 @@
-﻿# kiemtra01 - Multi-Service Django Commerce (Docker)
+# kiemtra01 - 4-Service Django Commerce
 
-Tai lieu nay duoc cap nhat theo code hien tai: chatbot da tach thanh service rieng `chatbot_service`.
+## 1. Overview
 
-## 1. Tong quan nhanh
+This repo now runs a 4-service architecture:
 
-- Mo hinh: 6 Django services + 2 database services trong Docker Compose
-- Nen tang: Python 3.12, Django 5.2.x, Django REST Framework
-- CSDL:
-  - MySQL: customer_service, staff_service
-  - PostgreSQL: laptop_service, mobile_service, accessory_service
-  - SQLite: chatbot_service (chi de luu metadata noi bo)
-- AI Chatbot:
-  - Frontend van goi endpoint customer: `/customer/chatbot/reply/`
-  - customer_service chi dong vai tro proxy/gateway
-  - chatbot_service xu ly RAG/recommendation/Gemma 4 31B (Google AI Studio key)/fallback tai `/api/chat/reply/`
-- Frontend chinh:
-  - Customer portal: http://localhost:8000/customer/login/
-  - Staff portal: http://localhost:8003/staff/login/
+- `user_service`: shared auth source, customer/staff web UI, gateway/orchestrator, editorial content, chatbot proxy.
+- `product_service`: unified catalog API with 10 categories and 100 seeded products.
+- `order_service`: cart/saved/compare/order/shipping ownership plus analytics and legacy order import.
+- `chatbot_service`: RAG, category-affinity behavior model, chatbot reply, and PostgreSQL-backed behavior events.
 
-## 2. Service matrix
+Databases:
 
-| Service | Vai tro | DB | Host Port | Container Port |
-|---|---|---|---:|---:|
-| customer_service | Customer UI + don hang + tong hop san pham + proxy chatbot | MySQL customer_db | 8000 | 8000 |
-| staff_service | Staff UI + CRUD san pham qua API gateway | MySQL staff_db | 8003 | 8000 |
-| laptop_service | Catalog API cho laptop | PostgreSQL laptop_db | 8001 | 8000 |
-| mobile_service | Catalog API cho mobile | PostgreSQL mobile_db | 8002 | 8000 |
-| accessory_service | Catalog API cho accessory | PostgreSQL accessory_db | 8004 | 8000 |
-| chatbot_service | Chatbot API (RAG + Gemma/Gemini + fallback) | SQLite | 8005 | 8000 |
-| mysql | DB server cho customer/staff | - | not published | 3306 |
-| postgres | DB server cho cac catalog services | - | not published | 5432 |
+- MySQL: `user_service`, `order_service`
+- PostgreSQL: `product_service`, `chatbot_service`
 
-## 3. Kien truc va luong giao tiep
+Public entry points:
 
-### 3.1 Luong tong quan
+- Customer + staff UI: `http://localhost:8000/` and `http://localhost:8003/`
+- Product API: `http://localhost:8001/api/`
+- Chatbot API: `http://localhost:8005/api/`
 
-1. Customer dang nhap vao customer_service
-2. customer_service goi 3 catalog APIs de tong hop danh sach san pham
-3. Customer add cart -> checkout -> pay
-4. Staff dang nhap vao staff_service va CRUD san pham qua catalog APIs
-5. Frontend chat widget goi `/customer/chatbot/reply/`
-6. customer_service:
-  - tao user_context + user_ref
-  - goi chatbot_service `/api/chat/reply/`
-7. chatbot_service:
-  - tu suy luan behavior signal trong chatbot engine
-  - retrieve RAG context tu KB
-  - goi LLM provider theo cau hinh env
-  - fallback rule-based neu LLM loi/khong co key
-  - tra ve answer + recommendations + citations
+## 2. Service Matrix
 
-### 3.2 Networking noi bo Docker
+| Service | Role | DB | Host Port |
+|---|---|---|---:|
+| `user_service` | Customer/staff UI, auth, gateway, editorial content | MySQL `user_db` | `8000`, `8003` |
+| `product_service` | Unified catalog API | PostgreSQL `product_db` | `8001` |
+| `order_service` | Cart/order/shipping API, internal-only by default, consumed by `user_service` | MySQL `order_db` | internal |
+| `chatbot_service` | Chatbot + RAG + behavior persistence | PostgreSQL `chatbot_db` | `8005` |
 
-Noi bo Docker network phai dung hostname co dau gach ngang:
+## 3. Key Contracts
 
-- http://laptop-service:8000
-- http://mobile-service:8000
-- http://accessory-service:8000
-- http://chatbot-service:8000
-
-Khong dung hostname co underscore vi co the gay HTTP 400 voi service-to-service call.
-
-### 3.3 Bao mat ghi du lieu catalog
-
-- GET: mo cho tat ca
-- POST/PUT/DELETE: catalog services kiem tra header `X-Staff-Key`
-- Key mong doi: `STAFF_API_KEY` (mac dinh `dev-staff-key`)
-
-## 4. Chi tiet tung service
-
-### 4.1 customer_service (port 8000)
-
-Chuc nang:
-
-- Dang ky/dang nhap customer
-- Dashboard tong hop 3 catalog services
-- Saved/Compare/Cart/Checkout/Orders/Pay
-- Product detail + related products (mixed/similar)
-- Endpoint chatbot cho frontend: `/customer/chatbot/reply/`
-
-Luu y:
-
-- customer_service KHONG con chat engine local
-- customer_service goi chatbot_service thong qua `CHATBOT_SERVICE_URL`
-
-### 4.2 chatbot_service (port 8005)
-
-Chuc nang:
-
-- API: `POST /api/chat/reply/`
-- Retrieve context tu KB (FAQ + product docs)
-- Rank recommendations
-- Goi LLM provider (mac dinh Gemma 4 31B qua Google AI Studio key)
-- Fallback rule-based khi LLM unavailable
-- Tra response JSON gom answer/recommendations/citations/source/fallback_used/error_code
-
-### 4.3 staff_service (port 8003)
-
-- Dang nhap staff
-- CRUD san pham o 3 catalog services
-- Tu dong gan `X-Staff-Key` cho write APIs
-
-### 4.4 catalog services (laptop/mobile/accessory)
-
-- API duoi `/api/products/`
-- Ho tro query: `search`, `brand`, `min_price`, `max_price`, `in_stock`
-- Model Product: id, name, brand, description, image_url, price, stock
-
-## 5. URL map
-
-### 5.1 Customer service (http://localhost:8000)
+Customer-facing routes kept stable:
 
 - `/customer/login/`
 - `/customer/register/`
 - `/customer/dashboard/`
-- `/customer/products/<service>/<id>/`
+- `/customer/products/<category_slug>/<id>/`
 - `/customer/cart/`
 - `/customer/orders/`
-- `/customer/chatbot/reply/` (POST JSON, frontend goi vao day)
+- `/customer/chatbot/reply/`
 
-### 5.2 Staff service (http://localhost:8003)
+Staff-facing routes:
 
 - `/staff/login/`
+- `/staff/register/`
 - `/staff/dashboard/`
+- `/staff/items/`
+- `/staff/customers/`
+- `/staff/orders/`
 
-### 5.3 Catalog APIs
+Catalog API:
 
-- Laptop: http://localhost:8001/api/products/
-- Mobile: http://localhost:8002/api/products/
-- Accessory: http://localhost:8004/api/products/
+- `GET /api/categories/`
+- `GET /api/products/`
+- `GET /api/products/<id>/`
+- `POST/PUT/DELETE /api/products/...` with `X-Staff-Key`
 
-### 5.4 Chatbot API
+Order API is internal-first and used by `user_service` for cart/saved/compare/checkout/orders/shipping. The host port is exposed for smoke tests and operational inspection.
 
-- Chatbot service base: http://localhost:8005/
-- Endpoint: `POST /api/chat/reply/`
-- Noi bo customer->chatbot: `http://chatbot-service:8000/api/chat/reply/`
+## 4. Environment
 
-### 5.5 Gateway manager (moi)
+Copy env template:
 
-- Folder quan ly gateway: `services/customer_service/customer/api_gateway/`
-- Web dashboard: http://localhost:8000/gateway/
-- JSON index: http://localhost:8000/gateway/apis/
-- Muc tieu: xem tap trung gateway routes cua customer_service + staff_service va mapping den upstream services.
-
-## 6. Bien moi truong (.env)
-
-Tao `.env` tu `.env.example`:
-
-```bash
+```powershell
 copy .env.example .env
 ```
 
-Bien quan trong:
+Important variables:
 
-- Shared:
-  - `STAFF_API_KEY`
-- Product service URLs:
-  - `LAPTOP_SERVICE_URL=http://laptop-service:8000`
-  - `MOBILE_SERVICE_URL=http://mobile-service:8000`
-  - `ACCESSORY_SERVICE_URL=http://accessory-service:8000`
-- Chatbot routing:
-  - `CHATBOT_SERVICE_URL=http://chatbot-service:8000`
-- LLM provider:
-  - `LLM_PROVIDER=gemma`
-  - `GEMMA_MODEL=gemma-4-31b-it`
-  - `GEMMA_TIMEOUT_SECONDS=45`
-- Google AI Studio key (dung chung cho Gemma/Gemini):
-  - `GEMINI_API_KEY`
-- OpenRouter (optional, chi can khi `LLM_PROVIDER=openrouter`):
-  - `OPENROUTER_API_KEY`
-- Gemini (optional backup provider):
-  - `CHATBOT_GEMINI_MODEL=gemini-3.1-flash-lite-preview`
-  - `GEMINI_TIMEOUT_SECONDS=35`
+- `USER_MYSQL_DATABASE`, `USER_MYSQL_USER`, `USER_MYSQL_PASSWORD`
+- `ORDER_MYSQL_DATABASE`, `ORDER_MYSQL_USER`, `ORDER_MYSQL_PASSWORD`
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `PRODUCT_POSTGRES_DB`, `CHATBOT_POSTGRES_DB`
+- `USER_SERVICE_URL`
+- `PRODUCT_SERVICE_URL`
+- `ORDER_SERVICE_URL`
+- `CHATBOT_SERVICE_URL`
+- `ORDER_SERVICE_INTERNAL_KEY`
+- `STAFF_API_KEY`
+- `CHATBOT_INGEST_KEY`
+- `LLM_PROVIDER`, `GEMMA_MODEL`, `GEMINI_API_KEY`, `CHATBOT_GEMINI_MODEL`
 
-## 7. Runbook nhanh
+## 5. Runbook
 
-### 7.1 Start
+Start everything:
 
 ```bash
-copy .env.example .env
 docker compose up --build -d
 ```
 
-### 7.2 Kiem tra
+Check containers:
 
 ```bash
 docker compose ps
-docker compose logs -f customer_service
-docker compose logs -f chatbot_service
+docker compose logs --tail=120 user_service order_service product_service chatbot_service
 ```
 
-### 7.3 Stop
+Stop:
 
 ```bash
 docker compose down
 ```
 
-## 8. Migrate, seed, chatbot setup
+## 6. Migrations And Seed
 
-### 8.1 Migrate
+Run migrations:
 
 ```bash
-docker compose exec customer_service python manage.py migrate
-docker compose exec staff_service python manage.py migrate
-docker compose exec laptop_service python manage.py migrate
-docker compose exec mobile_service python manage.py migrate
-docker compose exec accessory_service python manage.py migrate
+docker compose exec user_service python manage.py migrate
+docker compose exec order_service python manage.py migrate
+docker compose exec product_service python manage.py migrate
 docker compose exec chatbot_service python manage.py migrate
 ```
 
-### 8.2 Seed products + content
+Seed catalog + editorial content:
 
 ```bash
-docker compose exec laptop_service python manage.py seed_products --reset
-docker compose exec mobile_service python manage.py seed_products --reset
-docker compose exec accessory_service python manage.py seed_products --reset
-docker compose exec customer_service python manage.py seed_editorial_content --reset
+docker compose exec product_service python manage.py seed_products --reset
+docker compose exec user_service python manage.py seed_editorial_content --reset
 ```
 
-### 8.3 Build chatbot KB (service moi)
+Build chatbot artifacts:
 
 ```bash
 docker compose exec chatbot_service python manage.py build_chat_kb --max-products 160
+docker compose exec chatbot_service python manage.py train_behavior_model
 ```
 
-Hoac dung script dong bo tu dong (build KB + train behavior model + copy artifacts ve host + xoa copy customer):
+## 7. Legacy Migration
+
+Merge legacy customer/staff accounts into `user_service`:
+
+```bash
+docker compose exec user_service python manage.py migrate_legacy_users --dry-run
+docker compose exec user_service python manage.py migrate_legacy_users
+```
+
+Import legacy order history from `customer_db` into `order_service`:
+
+```bash
+docker compose exec order_service python manage.py import_legacy_orders
+```
+
+Backfill chatbot behavior from current `order_service` history:
+
+```bash
+docker compose exec user_service python manage.py backfill_chatbot_behavior --dry-run
+docker compose exec user_service python manage.py backfill_chatbot_behavior
+```
+
+## 8. Verification Checklist
+
+- `docker compose up --build -d` reaches a clean state with:
+  - MySQL healthy before `user_service` and `order_service` bootstrap/migrate
+  - PostgreSQL healthy before `product_service` and `chatbot_service` bootstrap/migrate
+- Customer register/login works.
+- Customer dashboard loads unified categories/products.
+- Saved/compare/cart/checkout/orders/payment work through `order_service`.
+- Staff login works.
+- Staff can create/update/delete products across multiple categories.
+- Staff can view customers and update shipping at `/staff/orders/`.
+- `build_chat_kb` and `train_behavior_model` complete successfully.
+- `/customer/chatbot/reply/` returns recommendations with valid `category_slug`.
+- `docker compose ps` shows:
+  - `user_service` on `8000` and `8003`
+  - `product_service` on `8001`
+  - `order_service` reachable on the Docker network only via `http://order-service:8000`
+  - `chatbot_service` on `8005`
+- No runtime env or Docker hostname references remain for `customer_service`, `staff_service`, `laptop_service`, `mobile_service`, or `accessory_service`.
+
+## 9. Smoke Commands
+
+PowerShell examples:
 
 ```powershell
-./scripts/sync-chatbot-kb.ps1
+Invoke-WebRequest http://localhost:8000/customer/login/ | Select-Object -ExpandProperty StatusCode
+Invoke-WebRequest http://localhost:8001/api/categories/ | Select-Object -ExpandProperty StatusCode
+Invoke-WebRequest http://localhost:8005/api/chat/reply/ -Method Post -ContentType 'application/json' -Body '{"message":"goi y laptop hoc tap"}' | Select-Object -ExpandProperty StatusCode
+docker compose exec user_service python manage.py shell -c "import requests; print(requests.get('http://order-service:8000/api/staff/orders/', headers={'X-Internal-Key':'dev-order-internal-key'}).status_code)"
 ```
 
-Hoac chay task trong VS Code:
+Only remove the legacy service folders after these smoke checks pass for the 4 target services.
 
-- `chatbot: sync chatbot artifacts`
-- `chatbot: rebuild + sync artifacts`
+## 10. Chatbot Artifacts
 
-Artifact sau khi dong bo:
+Host bind-mounted artifacts live under:
 
 - `services/chatbot_service/chatbot/artifacts/knowledge_base.json`
 - `services/chatbot_service/chatbot/artifacts/model_behavior.json`
+- `services/chatbot_service/chatbot/artifacts/training_data_behavior.json`
+- `services/chatbot_service/chatbot/artifacts/runtime_config.json`
 
-### 8.4 Train model_behavior (chatbot_service)
+## 11. Notes
 
-```bash
-docker compose exec chatbot_service python manage.py train_behavior_model --epochs 120 --lr 0.02
-```
-
-### 8.5 Kiem tra LLM config da nap cho chatbot_service
-
-```bash
-docker compose exec chatbot_service python -c "import os; print('LLM_PROVIDER=' + os.getenv('LLM_PROVIDER','')); print('GEMMA_MODEL=' + os.getenv('GEMMA_MODEL','')); print('OPENROUTER_API_KEY_SET=' + ('1' if os.getenv('OPENROUTER_API_KEY') else '0')); print('GEMINI_API_KEY_SET=' + ('1' if os.getenv('GEMINI_API_KEY') else '0'))"
-```
-
-Neu `GEMINI_API_KEY_SET=0` (khi `LLM_PROVIDER=gemma`), chatbot se tra loi fallback.
-
-## 9. Luong demo ngan (end-to-end)
-
-1. Dang nhap staff va tao/sua 1 product
-2. Quay customer dashboard de thay du lieu cap nhat
-3. Vao product detail, test related products
-4. Mo chat widget:
-   - hoi 1 cau tieng Viet
-   - hoi 1 cau tieng Anh
-5. Add cart -> checkout -> pay
-6. Xac nhan chatbot response co recommendations + citations
-
-## 10. Troubleshooting
-
-### 10.1 staff login 404 tren port 8000
-
-- Dung sai service. Staff dung port 8003.
-
-### 10.2 customer khong goi duoc chatbot_service
-
-- Kiem tra `CHATBOT_SERVICE_URL`
-- Kiem tra `docker compose ps` co `chatbot_service` dang Up
-- Kiem tra logs chatbot:
-
-```bash
-docker compose logs -f chatbot_service
-```
-
-### 10.3 Write API bi 403
-
-- Kiem tra `STAFF_API_KEY` giua staff_service va catalog services
-
-### 10.4 Chatbot khong goi duoc LLM provider
-
-- Kiem tra `LLM_PROVIDER` trong `.env`
-- Neu `LLM_PROVIDER=gemma`: kiem tra `GEMINI_API_KEY`, `GEMMA_MODEL`
-- Neu `LLM_PROVIDER=openrouter`: kiem tra `OPENROUTER_API_KEY`, `GEMMA_MODEL`
-- Neu `LLM_PROVIDER=gemini`: kiem tra `GEMINI_API_KEY`, `GEMINI_MODEL`
-- Rebuild service sau khi sua env:
-
-```bash
-docker compose up -d --build chatbot_service customer_service
-```
-
-## 11. Ghi chu quan trong cho bao cao
-
-- Kien truc hien tai da tach chatbot thanh microservice rieng.
-- Frontend khong can doi endpoint: van goi `/customer/chatbot/reply/`.
-- customer_service dong vai tro gateway/proxy.
-- chatbot_service xu ly behavior + RAG + LLM + fallback.
+- No service uses SQLite.
+- MySQL/PostgreSQL bootstrap scripts are expected to reconcile reused Docker volumes to `user_db`, `order_db`, `product_db`, and `chatbot_db` without requiring manual volume deletion.
+- Legacy cart/saved/compare data is intentionally not migrated.
+- Legacy orders are preserved as snapshot history and are not forced to relink to the new catalog taxonomy.
+- `user_service` remains the recovery owner for chatbot behavior via `backfill_chatbot_behavior`.

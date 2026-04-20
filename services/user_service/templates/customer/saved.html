@@ -1,0 +1,67 @@
+{% extends 'customer/base.html' %}
+{% block title %}Saved Products{% endblock %}
+{% block content %}
+<section class="section-head cart-head" data-reveal>
+  <span>Saved</span>
+  <h1>Your Saved <em>Products</em></h1>
+  <p>Everything you bookmarked for later is listed here.</p>
+</section>
+
+{% if saved_items %}
+<section class="product-grid saved-grid" data-reveal>
+  {% for item in saved_items %}
+  <article class="store-card saved-card">
+    <a class="product-image" href="/customer/products/{{ item.category_slug|default:item.product_service }}/{{ item.product_id }}/">
+      <span class="product-service">{{ item.category_name|default:item.category_slug|default:item.product_service|title }}</span>
+      <img loading="lazy" src="{{ item.product_image_url|default:'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1200&q=80' }}" alt="{{ item.product_name }}">
+    </a>
+
+    <div class="product-meta">
+      <h3>{{ item.product_name }}</h3>
+      <p>{{ item.product_brand|default:'N/A' }}</p>
+    </div>
+
+    <div class="price-row">
+      <strong>${{ item.unit_price }}</strong>
+      <span>Saved {{ item.created_at|slice:':10' }}</span>
+    </div>
+
+    <div class="card-actions-row">
+      <a class="cta-light" href="/customer/products/{{ item.category_slug|default:item.product_service }}/{{ item.product_id }}/">View Details</a>
+      <form method="post" action="/customer/cart/add/" class="add-form-inline">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="/customer/saved/">
+        <input type="hidden" name="category_slug" value="{{ item.category_slug|default:item.product_service }}">
+        <input type="hidden" name="category_name" value="{{ item.category_name }}">
+        <input type="hidden" name="product_id" value="{{ item.product_id }}">
+        <input type="hidden" name="product_name" value="{{ item.product_name }}">
+        <input type="hidden" name="product_brand" value="{{ item.product_brand }}">
+        <input type="hidden" name="product_image_url" value="{{ item.product_image_url }}">
+        <input type="hidden" name="unit_price" value="{{ item.unit_price }}">
+        <input type="hidden" name="stock" value="999">
+        <button type="submit" class="cta-dark">Add To Cart</button>
+      </form>
+    </div>
+
+    <form method="post" action="/customer/saved/toggle/" class="add-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="/customer/saved/">
+      <input type="hidden" name="category_slug" value="{{ item.category_slug|default:item.product_service }}">
+      <input type="hidden" name="category_name" value="{{ item.category_name }}">
+      <input type="hidden" name="product_id" value="{{ item.product_id }}">
+      <input type="hidden" name="product_name" value="{{ item.product_name }}">
+      <input type="hidden" name="product_brand" value="{{ item.product_brand }}">
+      <input type="hidden" name="product_image_url" value="{{ item.product_image_url }}">
+      <input type="hidden" name="unit_price" value="{{ item.unit_price }}">
+      <input type="hidden" name="stock" value="0">
+      <button type="submit" class="cta-light danger-light">Remove From Saved</button>
+    </form>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="empty-state" data-reveal>
+  You have not saved any products yet. Browse products and click Save to build your shortlist.
+</section>
+{% endif %}
+{% endblock %}

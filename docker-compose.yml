@@ -5,6 +5,12 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
     volumes:
       - mysql_data:/var/lib/mysql
       - ./docker/mysql-init:/docker-entrypoint-initdb.d
@@ -17,66 +23,35 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres-init:/docker-entrypoint-initdb.d
 
-  laptop_service:
-    build: ./services/laptop_service
-    container_name: kiemtra01_laptop
-    hostname: laptop-service
+  product_service:
+    build: ./services/product_service
+    container_name: kiemtra01_product
+    hostname: product-service
     restart: unless-stopped
     environment:
       DJANGO_DEBUG: "1"
       DJANGO_ALLOWED_HOSTS: "*"
-      POSTGRES_DB: laptop_db
+      POSTGRES_DB: ${PRODUCT_POSTGRES_DB:-product_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       STAFF_API_KEY: ${STAFF_API_KEY:-dev-staff-key}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8001:8000"
-
-  mobile_service:
-    build: ./services/mobile_service
-    container_name: kiemtra01_mobile
-    hostname: mobile-service
-    restart: unless-stopped
-    environment:
-      DJANGO_DEBUG: "1"
-      DJANGO_ALLOWED_HOSTS: "*"
-      POSTGRES_DB: mobile_db
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
-      STAFF_API_KEY: ${STAFF_API_KEY:-dev-staff-key}
-    depends_on:
-      - postgres
-    ports:
-      - "8002:8000"
-
-  accessory_service:
-    build: ./services/accessory_service
-    container_name: kiemtra01_accessory
-    hostname: accessory-service
-    restart: unless-stopped
-    environment:
-      DJANGO_DEBUG: "1"
-      DJANGO_ALLOWED_HOSTS: "*"
-      POSTGRES_DB: accessory_db
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
-      STAFF_API_KEY: ${STAFF_API_KEY:-dev-staff-key}
-    depends_on:
-      - postgres
-    ports:
-      - "8004:8000"
 
   chatbot_service:
     build: ./services/chatbot_service
@@ -86,9 +61,12 @@ services:
     environment:
       DJANGO_DEBUG: "1"
       DJANGO_ALLOWED_HOSTS: "*"
-      LAPTOP_SERVICE_URL: http://laptop-service:8000
-      MOBILE_SERVICE_URL: http://mobile-service:8000
-      ACCESSORY_SERVICE_URL: http://accessory-service:8000
+      POSTGRES_DB: ${CHATBOT_POSTGRES_DB:-chatbot_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      PRODUCT_SERVICE_URL: http://product-service:8000
       LLM_PROVIDER: ${LLM_PROVIDER:-gemma}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1/chat/completions}
@@ -100,62 +78,68 @@ services:
       GEMINI_MODEL: ${CHATBOT_GEMINI_MODEL:-gemini-3.1-flash-lite-preview}
       GEMINI_TIMEOUT_SECONDS: ${GEMINI_TIMEOUT_SECONDS:-35}
     depends_on:
-      - laptop_service
-      - mobile_service
-      - accessory_service
+      postgres:
+        condition: service_healthy
+      product_service:
+        condition: service_started
+    volumes:
+      - ./services/chatbot_service/chatbot/artifacts:/app/chatbot/artifacts
     ports:
       - "8005:8000"
 
-  customer_service:
-    build: ./services/customer_service
-    container_name: kiemtra01_customer
-    hostname: customer-service
+  order_service:
+    build: ./services/order_service
+    container_name: kiemtra01_order
+    hostname: order-service
     restart: unless-stopped
     environment:
       DJANGO_DEBUG: "1"
       DJANGO_ALLOWED_HOSTS: "*"
       MYSQL_HOST: mysql
       MYSQL_PORT: "3306"
-      MYSQL_DATABASE: ${CUSTOMER_MYSQL_DATABASE:-customer_db}
-      MYSQL_USER: ${CUSTOMER_MYSQL_USER:-customer_user}
-      MYSQL_PASSWORD: ${CUSTOMER_MYSQL_PASSWORD:-customer_password}
-      LAPTOP_SERVICE_URL: http://laptop-service:8000
-      MOBILE_SERVICE_URL: http://mobile-service:8000
-      ACCESSORY_SERVICE_URL: http://accessory-service:8000
-      CHATBOT_SERVICE_URL: http://chatbot-service:8000
+      MYSQL_DATABASE: ${ORDER_MYSQL_DATABASE:-order_db}
+      MYSQL_USER: ${ORDER_MYSQL_USER:-order_user}
+      MYSQL_PASSWORD: ${ORDER_MYSQL_PASSWORD:-order_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      ORDER_SERVICE_INTERNAL_KEY: ${ORDER_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
     depends_on:
-      - mysql
-      - laptop_service
-      - mobile_service
-      - accessory_service
-      - chatbot_service
+      mysql:
+        condition: service_healthy
+
+  user_service:
+    build: ./services/user_service
+    container_name: kiemtra01_user
+    hostname: user-service
+    restart: unless-stopped
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_ALLOWED_HOSTS: "*"
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${USER_MYSQL_DATABASE:-user_db}
+      MYSQL_USER: ${USER_MYSQL_USER:-user_user}
+      MYSQL_PASSWORD: ${USER_MYSQL_PASSWORD:-user_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      USER_SERVICE_URL: http://user-service:8000
+      PRODUCT_SERVICE_URL: http://product-service:8000
+      ORDER_SERVICE_URL: http://order-service:8000
+      CHATBOT_SERVICE_URL: http://chatbot-service:8000
+      ORDER_SERVICE_INTERNAL_KEY: ${ORDER_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
+      STAFF_API_KEY: ${STAFF_API_KEY:-dev-staff-key}
+      CHATBOT_REQUEST_TIMEOUT_SECONDS: ${CHATBOT_REQUEST_TIMEOUT_SECONDS:-40}
+      CHATBOT_REQUEST_RETRIES: ${CHATBOT_REQUEST_RETRIES:-2}
+      CHATBOT_INGEST_KEY: ${CHATBOT_INGEST_KEY:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      product_service:
+        condition: service_started
+      order_service:
+        condition: service_started
+      chatbot_service:
+        condition: service_started
     ports:
       - "8000:8000"
-
-  staff_service:
-    build: ./services/staff_service
-    container_name: kiemtra01_staff
-    restart: unless-stopped
-    environment:
-      DJANGO_DEBUG: "1"
-      DJANGO_ALLOWED_HOSTS: "*"
-      MYSQL_HOST: mysql
-      MYSQL_PORT: "3306"
-      MYSQL_DATABASE: ${STAFF_MYSQL_DATABASE:-staff_db}
-      MYSQL_USER: ${STAFF_MYSQL_USER:-staff_user}
-      MYSQL_PASSWORD: ${STAFF_MYSQL_PASSWORD:-staff_password}
-      LAPTOP_SERVICE_URL: http://laptop-service:8000
-      MOBILE_SERVICE_URL: http://mobile-service:8000
-      ACCESSORY_SERVICE_URL: http://accessory-service:8000
-      CUSTOMER_SERVICE_URL: http://customer-service:8000
-      STAFF_API_KEY: ${STAFF_API_KEY:-dev-staff-key}
-    depends_on:
-      - mysql
-      - laptop_service
-      - mobile_service
-      - accessory_service
-      - customer_service
-    ports:
       - "8003:8000"
 
 volumes:

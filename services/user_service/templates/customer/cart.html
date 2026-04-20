@@ -1,0 +1,56 @@
+{% extends 'customer/base.html' %}
+{% block title %}Your Cart{% endblock %}
+{% block content %}
+<section class="section-head cart-head">
+  <span>Cart</span>
+  <h1>Your <em>Shopping Cart</em></h1>
+  <p>Review products, add shipping details, then create a pending order.</p>
+</section>
+
+{% if cart_items %}
+<section class="cart-grid">
+  <div class="cart-list-panel">
+    {% for item in cart_items %}
+    <article class="cart-row">
+      <a class="cart-thumb" href="/customer/products/{{ item.category_slug|default:item.product_service }}/{{ item.product_id }}/">
+        <img loading="lazy" src="{{ item.product_image_url|default:'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=700&q=80' }}" alt="{{ item.product_name }}">
+      </a>
+      <div class="cart-row-main">
+        <h3>{{ item.product_name }}</h3>
+        <p>{{ item.product_brand|default:'N/A' }} | {{ item.category_name|default:item.category_slug|default:item.product_service|title }}</p>
+        <p>Qty: {{ item.quantity }}</p>
+      </div>
+      <div class="cart-row-right">
+        <strong>${{ item.total_price }}</strong>
+        <form method="post" action="/customer/cart/remove/{{ item.id }}/">
+          {% csrf_token %}
+          <button type="submit" class="cta-light danger-light">Remove</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  <aside class="cart-summary">
+    <h2>Summary</h2>
+    <p>Total: <strong>${{ cart_total }}</strong></p>
+    <form method="post" action="/customer/checkout/">
+      {% csrf_token %}
+      <p><label>Recipient name</label><input type="text" name="recipient_name" required></p>
+      <p><label>Phone</label><input type="text" name="phone" required></p>
+      <p><label>Address line</label><input type="text" name="address_line" required></p>
+      <p><label>City or region</label><input type="text" name="city_or_region" required></p>
+      <p><label>Postal code</label><input type="text" name="postal_code" required></p>
+      <p><label>Country</label><input type="text" name="country" required value="VN"></p>
+      <p><label>Note</label><textarea name="note" rows="3"></textarea></p>
+      <button type="submit" class="cta-dark block-link">Create Order</button>
+    </form>
+    <a href="/customer/dashboard/" class="cta-light block-link">Continue Shopping</a>
+  </aside>
+</section>
+{% else %}
+<section class="empty-state">
+  Your cart is empty. Return to the product list to add items.
+</section>
+{% endif %}
+{% endblock %}

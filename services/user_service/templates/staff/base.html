@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Staff Portal{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="staff-body">
+  <div class="layout-shell">
+    <aside class="sidebar staff-sidebar">
+      <h2>Staff Console</h2>
+      <nav>
+        <a href="/staff/dashboard/">Dashboard</a>
+        <a href="/staff/items/?category=all">All Products</a>
+        <a href="/staff/customers/">Customer Management</a>
+        <a href="/staff/orders/">Order Management</a>
+        <a href="/staff/logout/">Logout</a>
+      </nav>
+    </aside>
+    <main class="main-content">
+      {% include 'partials/messages.html' %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>
