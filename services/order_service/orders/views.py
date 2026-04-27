@@ -12,6 +12,15 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import CartItem, CompareItem, Order, OrderItem, OrderShipping, SavedItem
+from .service_clients import (
+    DownstreamServiceError,
+    cancel_payment,
+    confirm_order_payment,
+    create_pending_payment,
+    create_pending_shipment,
+    error_response_status,
+    update_order_shipment_status,
+)
 
 
 def _json_error(message, status=400):
@@ -176,6 +185,14 @@ def _serialize_shipping(shipping):
     }
 
 
+def _order_shipping_payload(order):
+    try:
+        shipping = order.shipping
+    except OrderShipping.DoesNotExist:
+        return None
+    return _serialize_shipping(shipping)
+
+
 def _serialize_order(order):
     try:
         shipping = order.shipping
@@ -258,7 +275,7 @@ def _format_analytics_datetime(value):
 
 
 def _build_customer_analytics(customer_limit=200, recent_limit=20, range_days=30):
-    now = timezone.now()
+    now = timezone.localtime(timezone.now())
     start_time = now - timedelta(days=max(1, range_days))
     orders = list(
         Order.objects.filter(created_at__gte=start_time)
@@ -318,6 +335,7 @@ def _build_customer_analytics(customer_limit=200, recent_limit=20, range_days=30
             if order_day in daily_revenue:
                 daily_revenue[order_day] += order.total_amount
             week_start = order_day - timedelta(days=order_day.weekday())
+            weekly_revenue.setdefault(week_start, Decimal("0"))
             weekly_revenue[week_start] += order.total_amount
 
             if len(row["recent_paid_orders"]) < 5:
@@ -608,39 +626,49 @@ def checkout_view(request):
     if shipping_data is None:
         return _json_error("Shipping data is required.")
 
-    with transaction.atomic():
-        cart_items = list(CartItem.objects.select_for_update().filter(user_id=user_id))
-        if not cart_items:
-            return _json_error("Cart is empty.")
+    created_payment = None
+    try:
+        with transaction.atomic():
+            cart_items = list(CartItem.objects.select_for_update().filter(user_id=user_id))
+            if not cart_items:
+                return _json_error("Cart is empty.")
 
-        total_amount = sum(item.total_price for item in cart_items)
-        if total_amount <= 0:
-            return _json_error("Cart total must be greater than zero.")
-        order = Order.objects.create(
-            user_id=user_id,
-            total_amount=total_amount,
-            payment_status=Order.PAYMENT_PENDING,
-            shipping_status=Order.SHIPPING_PENDING,
-            source=Order.SOURCE_LIVE,
-        )
-        OrderShipping.objects.create(order=order, **shipping_data)
-        OrderItem.objects.bulk_create(
-            [
-                OrderItem(
-                    order=order,
-                    category_slug=item.category_slug,
-                    category_name=item.category_name,
-                    product_id=item.product_id,
-                    product_name=item.product_name,
-                    product_brand=item.product_brand,
-                    product_image_url=item.product_image_url,
-                    unit_price=item.unit_price,
-                    quantity=item.quantity,
-                )
-                for item in cart_items
-            ]
-        )
-        CartItem.objects.filter(user_id=user_id).delete()
+            total_amount = sum(item.total_price for item in cart_items)
+            if total_amount <= 0:
+                return _json_error("Cart total must be greater than zero.")
+            order = Order.objects.create(
+                user_id=user_id,
+                total_amount=total_amount,
+                payment_status=Order.PAYMENT_PENDING,
+                shipping_status=Order.SHIPPING_PENDING,
+                source=Order.SOURCE_LIVE,
+            )
+            OrderShipping.objects.create(order=order, **shipping_data)
+            OrderItem.objects.bulk_create(
+                [
+                    OrderItem(
+                        order=order,
+                        category_slug=item.category_slug,
+                        category_name=item.category_name,
+                        product_id=item.product_id,
+                        product_name=item.product_name,
+                        product_brand=item.product_brand,
+                        product_image_url=item.product_image_url,
+                        unit_price=item.unit_price,
+                        quantity=item.quantity,
+                    )
+                    for item in cart_items
+                ]
+            )
+            CartItem.objects.filter(user_id=user_id).delete()
+            created_payment = create_pending_payment(order)
+            try:
+                create_pending_shipment(order, shipping_data)
+            except DownstreamServiceError:
+                cancel_payment(created_payment)
+                raise
+    except DownstreamServiceError as exc:
+        return _json_error(exc.message, status=error_response_status(exc))
 
     order = Order.objects.prefetch_related("items").select_related("shipping").get(id=order.id)
     return JsonResponse({"order": _serialize_order(order)}, status=201)
@@ -674,6 +702,14 @@ def pay_order_view(request, order_id):
     can_pay, message = order.can_pay()
     if not can_pay:
         return _json_error(message)
+
+    try:
+        payment = confirm_order_payment(order)
+    except DownstreamServiceError as exc:
+        return _json_error(exc.message, status=error_response_status(exc))
+
+    if str(payment.get("status") or "").lower() != "paid":
+        return _json_error("Payment service did not confirm payment.", status=502)
 
     order.payment_status = Order.PAYMENT_PAID
     order.paid_at = timezone.now()
@@ -716,6 +752,14 @@ def staff_shipping_update_view(request, order_id):
     transition_error = _shipping_transition_error(order, shipping_status)
     if transition_error is not None:
         return transition_error
+    try:
+        shipment = update_order_shipment_status(order, shipping_status, _order_shipping_payload(order))
+    except DownstreamServiceError as exc:
+        return _json_error(exc.message, status=error_response_status(exc))
+    upstream_status = str(shipment.get("status") or shipping_status).strip().lower()
+    if upstream_status not in Order.SHIPPING_VALUES:
+        return _json_error("Shipping service returned an invalid status.", status=502)
+    shipping_status = upstream_status
     order.shipping_status = shipping_status
     order.save(update_fields=["shipping_status", "updated_at"])
     return JsonResponse({"order": _serialize_order(order)})

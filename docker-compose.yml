@@ -111,6 +111,44 @@ services:
     ports:
       - "8005:8000"
 
+  payment_service:
+    build: ./services/payment_service
+    container_name: kiemtra01_payment
+    hostname: payment-service
+    restart: unless-stopped
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_ALLOWED_HOSTS: "*"
+      PAYMENT_POSTGRES_DB: ${PAYMENT_POSTGRES_DB:-payment_db}
+      PAYMENT_POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      PAYMENT_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PAYMENT_POSTGRES_HOST: postgres
+      PAYMENT_POSTGRES_PORT: "5432"
+      ORDER_SERVICE_INTERNAL_KEY: ${ORDER_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
+      PAYMENT_SERVICE_INTERNAL_KEY: ${PAYMENT_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  shipping_service:
+    build: ./services/shipping_service
+    container_name: kiemtra01_shipping
+    hostname: shipping-service
+    restart: unless-stopped
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_ALLOWED_HOSTS: "*"
+      SHIPPING_POSTGRES_DB: ${SHIPPING_POSTGRES_DB:-shipping_db}
+      SHIPPING_POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      SHIPPING_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SHIPPING_POSTGRES_HOST: postgres
+      SHIPPING_POSTGRES_PORT: "5432"
+      ORDER_SERVICE_INTERNAL_KEY: ${ORDER_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
+      SHIPPING_SERVICE_INTERNAL_KEY: ${SHIPPING_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   order_service:
     build: ./services/order_service
     container_name: kiemtra01_order
@@ -126,9 +164,17 @@ services:
       MYSQL_PASSWORD: ${ORDER_MYSQL_PASSWORD:-order_password}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
       ORDER_SERVICE_INTERNAL_KEY: ${ORDER_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
+      PAYMENT_SERVICE_URL: ${PAYMENT_SERVICE_URL:-http://payment-service:8000}
+      SHIPPING_SERVICE_URL: ${SHIPPING_SERVICE_URL:-http://shipping-service:8000}
+      PAYMENT_SERVICE_INTERNAL_KEY: ${PAYMENT_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
+      SHIPPING_SERVICE_INTERNAL_KEY: ${SHIPPING_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
     depends_on:
       mysql:
         condition: service_healthy
+      payment_service:
+        condition: service_started
+      shipping_service:
+        condition: service_started
 
   user_service:
     build: ./services/user_service
@@ -147,6 +193,8 @@ services:
       USER_SERVICE_URL: http://user-service:8000
       PRODUCT_SERVICE_URL: http://product-service:8000
       ORDER_SERVICE_URL: http://order-service:8000
+      PAYMENT_SERVICE_URL: http://payment-service:8000
+      SHIPPING_SERVICE_URL: http://shipping-service:8000
       CHATBOT_SERVICE_URL: http://chatbot-service:8000
       ORDER_SERVICE_INTERNAL_KEY: ${ORDER_SERVICE_INTERNAL_KEY:-dev-order-internal-key}
       STAFF_API_KEY: ${STAFF_API_KEY:-dev-staff-key}
@@ -160,11 +208,38 @@ services:
         condition: service_started
       order_service:
         condition: service_started
+      payment_service:
+        condition: service_started
+      shipping_service:
+        condition: service_started
       chatbot_service:
         condition: service_started
     ports:
       - "8000:8000"
       - "8003:8000"
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: kiemtra01_gateway
+    hostname: gateway
+    restart: unless-stopped
+    depends_on:
+      user_service:
+        condition: service_started
+      product_service:
+        condition: service_started
+      order_service:
+        condition: service_started
+      payment_service:
+        condition: service_started
+      shipping_service:
+        condition: service_started
+      chatbot_service:
+        condition: service_started
+    volumes:
+      - ./docker/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
 
 volumes:
   mysql_data:

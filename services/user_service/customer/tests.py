@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
 
 from .legacy_users import merge_legacy_accounts
 from .models import LegacyUserMapping
@@ -173,6 +175,132 @@ class SharedAuthFlowTests(TestCase):
         self.assertRedirects(response, reverse("staff_dashboard"))
 
 
+class JwtAuthApiTests(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+
+    def test_register_creates_customer_account_and_returns_tokens(self):
+        response = self.api_client.post(
+            reverse("api_auth_register"),
+            {
+                "username": "api-customer",
+                "email": "api-customer@example.com",
+                "password": "pass12345",
+                "confirm_password": "pass12345",
+                "first_name": "Api",
+                "last_name": "Customer",
+                "is_staff": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertIn("access", payload)
+        self.assertIn("refresh", payload)
+        self.assertEqual(payload["user"]["username"], "api-customer")
+        self.assertEqual(payload["user"]["role"], "customer")
+        self.assertEqual(payload["user"]["scopes"], ["customer"])
+        self.assertFalse(payload["user"]["is_staff"])
+        user = User.objects.get(username="api-customer")
+        self.assertFalse(user.is_staff)
+        self.assertFalse(user.is_superuser)
+
+    def test_token_returns_jwt_pair_with_user_role_payload(self):
+        User.objects.create_user(
+            username="api-customer",
+            email="api-customer@example.com",
+            password="pass12345",
+        )
+
+        response = self.api_client.post(
+            reverse("api_auth_token"),
+            {"username": "api-customer", "password": "pass12345"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("access", payload)
+        self.assertIn("refresh", payload)
+        self.assertEqual(payload["user"]["role"], "customer")
+        access = AccessToken(payload["access"])
+        self.assertEqual(access["role"], "customer")
+        self.assertEqual(access["scopes"], ["customer"])
+        self.assertFalse(access["is_staff"])
+
+    def test_refresh_token_and_me_endpoint_use_jwt(self):
+        User.objects.create_user(
+            username="api-customer",
+            email="api-customer@example.com",
+            password="pass12345",
+        )
+        token_response = self.api_client.post(
+            reverse("api_auth_token"),
+            {"username": "api-customer", "password": "pass12345"},
+            format="json",
+        )
+        refresh = token_response.json()["refresh"]
+
+        refresh_response = self.api_client.post(
+            reverse("api_auth_token_refresh"),
+            {"refresh": refresh},
+            format="json",
+        )
+
+        self.assertEqual(refresh_response.status_code, 200)
+        access = refresh_response.json()["access"]
+        me_response = self.api_client.get(
+            reverse("api_auth_me"),
+            HTTP_AUTHORIZATION=f"Bearer {access}",
+        )
+
+        self.assertEqual(me_response.status_code, 200)
+        payload = me_response.json()["user"]
+        self.assertEqual(payload["username"], "api-customer")
+        self.assertEqual(payload["role"], "customer")
+        self.assertEqual(payload["scopes"], ["customer"])
+
+    def test_staff_flags_are_exposed_for_existing_staff_accounts(self):
+        user = User.objects.create_user(
+            username="api-staff",
+            email="api-staff@example.com",
+            password="pass12345",
+        )
+        user.is_staff = True
+        user.save(update_fields=["is_staff"])
+
+        response = self.api_client.post(
+            reverse("api_auth_token"),
+            {"username": "api-staff", "password": "pass12345"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["user"]["is_staff"])
+        self.assertEqual(payload["user"]["role"], "staff")
+        self.assertEqual(payload["user"]["scopes"], ["staff"])
+        access = AccessToken(payload["access"])
+        self.assertTrue(access["is_staff"])
+        self.assertEqual(access["role"], "staff")
+
+    def test_session_login_still_works_for_customer_ui(self):
+        User.objects.create_user(
+            username="session-customer",
+            email="session-customer@example.com",
+            password="pass12345",
+        )
+
+        response = self.client.post(
+            reverse("customer_login"),
+            {"username": "session-customer", "password": "pass12345"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("customer_dashboard"))
+
+
 class CustomerGatewayFlowTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -196,10 +324,12 @@ class CustomerGatewayFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["stats"]["service_count"], 4)
+        self.assertEqual(payload["stats"]["service_count"], 6)
         self.assertGreaterEqual(payload["stats"]["route_count"], 7)
         self.assertIn("sections", payload)
         self.assertEqual(payload["gateway_dashboard_url"], "http://testserver/gateway/")
+        self.assertEqual(payload["services"]["payment_service"]["internal"], "http://payment-service:8000")
+        self.assertEqual(payload["services"]["shipping_service"]["internal"], "http://shipping-service:8000")
         chatbot_route = next(route for route in payload["routes"] if route["id"] == "chatbot-proxy")
         self.assertEqual(chatbot_route["upstream"], "chatbot_service")
         self.assertEqual(chatbot_route["public_urls"][0], "http://testserver/customer/chatbot/reply/")

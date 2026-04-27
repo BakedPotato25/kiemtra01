@@ -531,6 +531,12 @@ def product_detail_view(request, category_slug, product_id):
     category_lookup = fetch_category_lookup()
     category_meta = category_lookup.get(product.get("category_slug"), {})
     base_image = product.get("image_url") or category_meta.get("hero_image_url") or DEFAULT_CATEGORY_HERO
+    product = {
+        **product,
+        "image_fallback_url": product.get("image_fallback_url")
+        or category_meta.get("hero_image_url")
+        or DEFAULT_CATEGORY_HERO,
+    }
     gallery_pool = [
         category_meta.get("hero_image_url") or DEFAULT_CATEGORY_HERO,
         "https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&w=1400&q=80",

@@ -186,7 +186,7 @@ def _request_json(method, url, *, params=None, payload=None, headers=None, timeo
 
     return {
         "ok": response.ok,
-        "status_code": response.status_code,
+        "status_code": getattr(response, "status_code", 200 if response.ok else 502),
         "data": data if isinstance(data, dict) else {"results": data},
         "error": None if response.ok else (data.get("error") if isinstance(data, dict) else "upstream_error"),
     }
@@ -475,11 +475,14 @@ def build_staff_analytics_payload(customer_limit=200, recent_limit=20, range_day
     enriched_recent_orders = []
     for row in payload.get("recent_orders", []):
         user = user_map.get(row.get("user_id"))
+        display_name = ""
+        if user:
+            display_name = " ".join([user.first_name or "", user.last_name or ""]).strip() or user.username
         enriched_recent_orders.append(
             {
                 **row,
                 "username": user.username if user else "",
-                "display_name": " ".join([user.first_name or "", user.last_name or ""]).strip() or (user.username if user else f"User {row.get('user_id')}"),
+                "display_name": display_name or f"User {row.get('user_id')}",
             }
         )
     payload["recent_orders"] = enriched_recent_orders

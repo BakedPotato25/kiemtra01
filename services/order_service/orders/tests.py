@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from .management.commands import import_legacy_orders as import_legacy_orders_command
 from .models import CartItem, Order, OrderItem, OrderShipping
+from .service_clients import DownstreamServiceError
 from .views import _build_customer_analytics
 
 
@@ -51,6 +52,54 @@ class _FakeConnection:
 class OrderServiceTests(TestCase):
     def setUp(self):
         self.client.defaults["HTTP_X_INTERNAL_KEY"] = "dev-order-internal-key"
+        self.payment_create_patcher = patch("orders.views.create_pending_payment", side_effect=self._fake_create_payment)
+        self.payment_confirm_patcher = patch("orders.views.confirm_order_payment", side_effect=self._fake_confirm_payment)
+        self.shipment_create_patcher = patch("orders.views.create_pending_shipment", side_effect=self._fake_create_shipment)
+        self.shipment_update_patcher = patch("orders.views.update_order_shipment_status", side_effect=self._fake_update_shipment)
+        self.create_payment_mock = self.payment_create_patcher.start()
+        self.confirm_payment_mock = self.payment_confirm_patcher.start()
+        self.create_shipment_mock = self.shipment_create_patcher.start()
+        self.update_shipment_mock = self.shipment_update_patcher.start()
+        self.addCleanup(self.payment_create_patcher.stop)
+        self.addCleanup(self.payment_confirm_patcher.stop)
+        self.addCleanup(self.shipment_create_patcher.stop)
+        self.addCleanup(self.shipment_update_patcher.stop)
+
+    def _fake_create_payment(self, order):
+        return {
+            "id": order.id + 1000,
+            "order_id": order.id,
+            "user_id": order.user_id,
+            "amount": f"{order.total_amount:.2f}",
+            "status": "pending",
+        }
+
+    def _fake_confirm_payment(self, order):
+        return {
+            "id": order.id + 1000,
+            "order_id": order.id,
+            "user_id": order.user_id,
+            "amount": f"{order.total_amount:.2f}",
+            "status": "paid",
+            "paid_at": timezone.now().isoformat(),
+        }
+
+    def _fake_create_shipment(self, order, shipping_data):
+        return {
+            "id": order.id + 2000,
+            "order_id": order.id,
+            "user_id": order.user_id,
+            **shipping_data,
+            "status": "pending",
+        }
+
+    def _fake_update_shipment(self, order, shipping_status, shipping_data=None):
+        return {
+            "id": order.id + 2000,
+            "order_id": order.id,
+            "user_id": order.user_id,
+            "status": shipping_status,
+        }
 
     def _item_payload(self, **overrides):
         payload = {
@@ -120,6 +169,8 @@ class OrderServiceTests(TestCase):
         self.assertEqual(order["shipping_status"], Order.SHIPPING_PENDING)
         self.assertEqual(order["shipping"]["recipient_name"], "Nguyen Van A")
         self.assertEqual(len(order["items"]), 1)
+        self.create_payment_mock.assert_called_once()
+        self.create_shipment_mock.assert_called_once()
 
         pay_response = self.client.post(
             f"/api/orders/{order['id']}/pay/",
@@ -128,6 +179,7 @@ class OrderServiceTests(TestCase):
         )
         self.assertEqual(pay_response.status_code, 200)
         self.assertEqual(pay_response.json()["order"]["payment_status"], Order.PAYMENT_PAID)
+        self.confirm_payment_mock.assert_called_once()
 
         shipping_response = self.client.post(
             f"/api/staff/orders/{order['id']}/shipping/",
@@ -136,7 +188,28 @@ class OrderServiceTests(TestCase):
         )
         self.assertEqual(shipping_response.status_code, 200)
         self.assertEqual(shipping_response.json()["order"]["shipping_status"], Order.SHIPPING_PREPARING)
+        self.update_shipment_mock.assert_called_once()
         self.assertEqual(CartItem.objects.count(), 0)
+
+    def test_checkout_rolls_back_when_payment_service_fails(self):
+        self.create_payment_mock.side_effect = DownstreamServiceError("Payment service unavailable.", status_code=503)
+        add_response = self.client.post(
+            "/api/cart/",
+            data=json.dumps(self._item_payload(product_id=333, product_name="Rollback Item")),
+            content_type="application/json",
+        )
+        self.assertEqual(add_response.status_code, 201)
+
+        checkout_response = self.client.post(
+            "/api/checkout/",
+            data=json.dumps(self._shipping_payload()),
+            content_type="application/json",
+        )
+
+        self.assertEqual(checkout_response.status_code, 502)
+        self.assertEqual(checkout_response.json()["error"], "Payment service unavailable.")
+        self.assertEqual(Order.objects.count(), 0)
+        self.assertEqual(CartItem.objects.count(), 1)
 
     def test_compare_is_limited_to_four_items(self):
         for product_id in range(1, 5):

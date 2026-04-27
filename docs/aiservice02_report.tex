@@ -75,7 +75,7 @@
 \pagenumbering{arabic}
 
 \section{Abstract}
-This report presents the design and implementation of an AI service for a Docker-based e-commerce platform composed of four Django application services. The assignment requires four principal outcomes: the generation of a synthetic behavior dataset named \texttt{data\_user500.csv}, the training and evaluation of three sequence models (\texttt{RNN}, \texttt{LSTM}, and \texttt{biLSTM}), the construction of a Neo4j knowledge graph, and the deployment of a RAG-enabled chatbot integrated into the e-commerce interface. The present report documents these tasks in a structured academic style and uses repository artifacts, code excerpts, metrics, and screenshots as supporting evidence.
+This report presents the design and implementation of an AI service for a Docker-based e-commerce platform composed of six Django application services behind an Nginx gateway. The assignment requires four principal outcomes: the generation of a synthetic behavior dataset named \texttt{data\_user500.csv}, the training and evaluation of three sequence models (\texttt{RNN}, \texttt{LSTM}, and \texttt{biLSTM}), the construction of a Neo4j knowledge graph, and the deployment of a RAG-enabled chatbot integrated into the e-commerce interface. The present report documents these tasks in a structured academic style and uses repository artifacts, code excerpts, metrics, Mermaid diagrams, and screenshots as supporting evidence.
 
 The implemented system forms a coherent end-to-end pipeline rather than a collection of isolated exercises. Synthetic shopping sessions are first generated from the product catalog, then transformed into sequence-learning samples, imported into a graph structure, and finally reused by a hybrid retrieval-and-generation chatbot. The resulting AI functionality is exposed through dashboard recommendations, cart recommendations, and a custom chat widget, thereby satisfying both the analytical and integration-oriented requirements of the assignment brief.
 
@@ -96,11 +96,14 @@ This report addresses all requirements stated in the assignment brief:
   \item Integrate the AI features into the e-commerce system through product-list suggestions, cart suggestions, and a custom website chat interface.
 \end{enumerate}
 
-The repository already implements the complete pipeline and organizes the system into four Django services:
+The repository already implements the complete pipeline and organizes the system into six Django services plus the Nginx public gateway:
 \begin{itemize}
-  \item \texttt{user\_service}: authentication, customer/staff UI, and gateway orchestration.
+  \item \texttt{gateway}: Nginx entrypoint on port \texttt{8080} for public UI and API traffic.
+  \item \texttt{user\_service}: authentication, customer/staff UI, Django session UI auth, JWT API auth, and gateway orchestration.
   \item \texttt{product\_service}: catalog API with 10 categories and 100 seeded products.
-  \item \texttt{order\_service}: cart, saved items, compare list, checkout, payment, order ownership, and shipping flow.
+  \item \texttt{order\_service}: cart, saved items, compare list, checkout orchestration, order ownership, and order snapshots.
+  \item \texttt{payment\_service}: payment records and payment confirmation lifecycle.
+  \item \texttt{shipping\_service}: shipment records and shipping status lifecycle.
   \item \texttt{chatbot\_service}: synthetic dataset generation, sequence modeling, Neo4j graph integration, file-based retrieval, and chatbot API.
 \end{itemize}
 
@@ -126,14 +129,19 @@ This pipeline demonstrates that the project is not a set of disconnected deliver
 \toprule
 Service & Main responsibility & Port \\
 \midrule
-\texttt{user\_service} & Customer/staff UI, gateway logic, and rendering of AI outputs in dashboard, cart, and chat widget & \texttt{8000}, \texttt{8003} \\
+\texttt{gateway} & Nginx primary public entrypoint for customer UI, staff UI, auth API, catalog API, order API, payment API, shipping API, and chatbot API & \texttt{8080} \\
+\texttt{user\_service} & Customer/staff UI, session auth, JWT auth API, gateway logic, and rendering of AI outputs in dashboard, cart, and chat widget & \texttt{8000}, \texttt{8003} debug \\
 \texttt{product\_service} & Product catalog API, category metadata, and source of products used by recommendation features & \texttt{8001} \\
-\texttt{order\_service} & Cart, compare, saved items, checkout, payment, orders, and analytics & Internal Docker network \\
+\texttt{order\_service} & Cart, compare, saved items, checkout orchestration, orders, payment/shipping snapshots, and analytics & Internal Docker network \\
+\texttt{payment\_service} & Payment transaction records and confirmation lifecycle used by checkout and pay-order flows & Internal Docker network \\
+\texttt{shipping\_service} & Shipment records and staff-managed shipping status transitions & Internal Docker network \\
 \texttt{chatbot\_service} & Dataset generation, behavior modeling, graph retrieval, RAG, and chatbot API & \texttt{8005} \\
 \texttt{neo4j} & Knowledge graph storage and graph-based retrieval support & \texttt{7474}, \texttt{7687} \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+The public gateway for the implemented system is \texttt{http://localhost:8080/}. Direct service ports such as \texttt{8000}, \texttt{8001}, and \texttt{8005} remain useful for local debugging, but submission screenshots and smoke checks should prefer the gateway route. Authentication is also split by surface: browser-facing customer and staff pages use Django sessions, while API clients use JWT endpoints under \texttt{/api/auth/}.
 
 \subsection{Assignment Compliance Matrix}
 \begin{table}[H]
@@ -761,14 +769,15 @@ The repository currently satisfies all core requirements of the assignment:
   \item It builds a Neo4j knowledge graph from the behavior dataset.
   \item It implements a hybrid RAG chatbot on top of graph and file-based retrieval.
   \item It integrates AI recommendations directly into the e-commerce dashboard, cart, and website chat widget.
+  \item It exposes the system through Nginx on port \texttt{8080}, keeps JWT API auth alongside session UI auth, and separates payment and shipping into dedicated internal services.
 \end{enumerate}
 
 \subsection{Strengths of the Proposed Solution}
 \begin{itemize}
   \item The solution is end-to-end rather than isolated by phase.
   \item The same dataset supports classification, graph construction, and retrieval.
-  \item The architecture keeps clear service ownership between UI, catalog, order, and AI.
-  \item The repository already contains the required submission evidence: sample data, metric table, plots, graph screenshot, and UI screenshots.
+  \item The architecture keeps clear service ownership between UI/auth, catalog, orders, payments, shipping, and AI.
+  \item The repository already contains the required submission evidence: Mermaid diagrams, sample data, metric table, plots, graph artifacts, Neo4j screenshots, and UI screenshots.
   \item The chatbot includes fallback behavior so the website remains usable even when optional dependencies fail.
 \end{itemize}
 
@@ -799,13 +808,18 @@ Dataset statistics & \texttt{services/chatbot\_service/chatbot/artifacts/dataset
 Model comparison table & \texttt{services/chatbot\_service/chatbot/artifacts/metrics\_comparison.csv} \\
 Best-model explanation & \texttt{services/chatbot\_service/chatbot/artifacts/model\_best\_reason.txt} \\
 Best model file & \texttt{services/chatbot\_service/chatbot/artifacts/model\_best.keras} \\
+RAG knowledge base & \texttt{services/chatbot\_service/chatbot/artifacts/knowledge\_base.json} \\
+Runtime AI config & \texttt{services/chatbot\_service/chatbot/artifacts/runtime\_config.json} \\
 Confusion matrix & \texttt{services/chatbot\_service/chatbot/artifacts/confusion\_matrix\_rnn.png} \\
 Training history plot & \texttt{services/chatbot\_service/chatbot/artifacts/history\_rnn.png} \\
+Mermaid architecture diagrams & \texttt{docs/mermaid-diagrams-v1.md} \\
 Neo4j screenshot & \texttt{docs/evidence/screenshots/neo4j-browser.png} \\
 Neo4j screenshot (2) & \texttt{docs/evidence/screenshots/neo4j-browser-2.png} \\
+Neo4j graph SVG & \texttt{services/chatbot\_service/chatbot/artifacts/behavior\_graph\_demo.svg} \\
 Dashboard AI screenshot & \texttt{docs/evidence/screenshots/dashboard-ai.png} \\
 Cart AI screenshot & \texttt{docs/evidence/screenshots/cart-ai.png} \\
 Chat widget screenshot & \texttt{docs/evidence/screenshots/chat-widget.png} \\
+Gateway screenshot & \texttt{docs/evidence/screenshots/gateway-8080.png} \\
 Training notebook & \texttt{notebooks/phase3\_kaggle\_training\_2a.ipynb} \\
 \bottomrule
 \end{tabularx}
@@ -822,6 +836,10 @@ Training notebook & \texttt{notebooks/phase3\_kaggle\_training\_2a.ipynb} \\
   \item \texttt{services/chatbot\_service/chatbot/views.py}
   \item \texttt{services/user\_service/customer/services.py}
   \item \texttt{services/user\_service/customer/views.py}
+  \item \texttt{services/user\_service/customer/api\_auth.py}
+  \item \texttt{services/order\_service/orders/service\_clients.py}
+  \item \texttt{services/payment\_service/payments/views.py}
+  \item \texttt{services/shipping\_service/shipments/views.py}
   \item \texttt{services/user\_service/templates/customer/dashboard.html}
   \item \texttt{services/user\_service/templates/customer/cart.html}
   \item \texttt{services/user\_service/templates/partials/chat\_widget.html}
@@ -834,6 +852,7 @@ Upload the following files into the \texttt{Image/} folder in Overleaf:
   \item \texttt{history\_rnn.png}
   \item \texttt{neo4j-browser.png}
   \item \texttt{neo4j-browser-2.png}
+  \item \texttt{gateway-8080.png}
   \item \texttt{dashboard-ai.png}
   \item \texttt{cart-ai.png}
   \item \texttt{chat-widget.png}
