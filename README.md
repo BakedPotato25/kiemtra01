@@ -65,6 +65,7 @@ Staff-facing routes:
 Auth modes coexist:
 
 - Browser UI uses Django session auth for `/customer/*`, `/staff/*`, and `/admin/`.
+- Customer and staff UI sessions use separate cookies (`customer_sessionid`, `staff_sessionid`) so both roles can be demoed in one browser without logging each other out.
 - API auth uses JWT through `/api/auth/register/`, `/api/auth/token/`, `/api/auth/token/refresh/`, and `/api/auth/me/`.
 - Both auth surfaces are exposed through the Nginx gateway on `http://localhost:8080/`; direct `user_service` ports are for local debugging.
 

@@ -158,7 +158,7 @@ class MigrateLegacyUsersCommandTests(TestCase):
 
 
 class SharedAuthFlowTests(TestCase):
-    def test_customer_login_redirects_staff_user_to_staff_dashboard(self):
+    def test_customer_login_redirects_staff_user_to_staff_login(self):
         user = User.objects.create_user(
             username="ops",
             email="ops@example.com",
@@ -172,7 +172,61 @@ class SharedAuthFlowTests(TestCase):
             {"username": "ops", "password": "pass12345"},
         )
 
-        self.assertRedirects(response, reverse("staff_dashboard"))
+        self.assertRedirects(response, reverse("staff_login"))
+
+    def test_staff_session_cannot_render_customer_orders_as_empty_history(self):
+        user = User.objects.create_user(
+            username="ops-view",
+            email="ops-view@example.com",
+            password="pass12345",
+        )
+        user.is_staff = True
+        user.save(update_fields=["is_staff"])
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("customer_orders"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], f"{reverse('customer_login')}?next={reverse('customer_orders')}")
+
+    def test_customer_and_staff_sessions_can_coexist_in_one_browser(self):
+        customer = User.objects.create_user(
+            username="buyer-one",
+            email="buyer-one@example.com",
+            password="pass12345",
+        )
+        staff = User.objects.create_user(
+            username="ops-one",
+            email="ops-one@example.com",
+            password="pass12345",
+        )
+        staff.is_staff = True
+        staff.save(update_fields=["is_staff"])
+
+        customer_response = self.client.post(
+            reverse("customer_login"),
+            {"username": customer.username, "password": "pass12345"},
+        )
+        self.assertEqual(customer_response.status_code, 302)
+        self.assertEqual(customer_response["Location"], reverse("customer_dashboard"))
+        self.assertIn("customer_sessionid", self.client.cookies)
+
+        staff_response = self.client.post(
+            reverse("staff_login"),
+            {"username": staff.username, "password": "pass12345"},
+        )
+        self.assertEqual(staff_response.status_code, 302)
+        self.assertEqual(staff_response["Location"], reverse("staff_dashboard"))
+        self.assertIn("staff_sessionid", self.client.cookies)
+
+        with patch("customer.views.fetch_categories", return_value=[]), patch(
+            "customer.views.list_orders",
+            return_value=[],
+        ) as list_orders_mock:
+            response = self.client.get(reverse("customer_orders"))
+
+        self.assertEqual(response.status_code, 200)
+        list_orders_mock.assert_called_once_with(customer.id)
 
 
 class JwtAuthApiTests(TestCase):
@@ -732,3 +786,56 @@ class CustomerGatewayFlowTests(TestCase):
         self.assertContains(response, "/customer/products/audio/84/")
         self.assertContains(response, 'id="cart-rec-add-84"', html=False)
         self.assertContains(response, 'data-chat-endpoint="/customer/chatbot/reply/"', html=False)
+
+
+class CustomerOrderPageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="buyer",
+            email="buyer@example.com",
+            password="pass12345",
+        )
+        self.client.force_login(self.user)
+
+    def test_paid_order_labels_payment_and_shipping_statuses_separately(self):
+        orders = [
+            {
+                "id": 139,
+                "created_at": "2026-04-27T17:41:59+07:00",
+                "payment_status": "paid",
+                "shipping_status": "pending",
+                "total_amount": "188.00",
+                "shipping": {
+                    "recipient_name": "hoang",
+                    "phone": "0964768205",
+                    "address_line": "la thanh",
+                    "city_or_region": "ha noi",
+                    "postal_code": "100000",
+                    "country": "VN",
+                },
+                "items": [
+                    {
+                        "product_name": "Tablet Rest Pro",
+                        "category_name": "Bags & Stands",
+                        "category_slug": "bags-stands",
+                        "product_service": "bags-stands",
+                        "product_brand": "MOFT",
+                        "quantity": 1,
+                        "unit_price": "59.00",
+                    }
+                ],
+            }
+        ]
+
+        with patch("customer.views.fetch_categories", return_value=[]), patch(
+            "customer.views.list_orders",
+            return_value=orders,
+        ):
+            response = self.client.get(reverse("customer_orders"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Payment")
+        self.assertContains(response, "Complete")
+        self.assertContains(response, "Shipping")
+        self.assertContains(response, "Pending")
+        self.assertNotContains(response, "Pay Now")

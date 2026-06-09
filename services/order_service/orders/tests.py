@@ -254,7 +254,7 @@ class OrderServiceTests(TestCase):
         self.assertEqual(compare_response.status_code, 201)
         self.assertEqual(compare_response.json()["action"], "added")
 
-    def test_staff_shipping_requires_paid_order_and_valid_transition(self):
+    def test_staff_shipping_requires_paid_order_and_customer_can_view_each_phase(self):
         order = self._checkout_order()
 
         unpaid_response = self.client.post(
@@ -277,17 +277,29 @@ class OrderServiceTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(preparing_response.status_code, 200)
+        customer_preparing = self.client.get("/api/orders/?user_id=7")
+        self.assertEqual(customer_preparing.status_code, 200)
+        self.assertEqual(customer_preparing.json()["orders"][0]["shipping_status"], Order.SHIPPING_PREPARING)
+
+        shipped_response = self.client.post(
+            f"/api/staff/orders/{order['id']}/shipping/",
+            data=json.dumps({"shipping_status": Order.SHIPPING_SHIPPED}),
+            content_type="application/json",
+        )
+        self.assertEqual(shipped_response.status_code, 200)
+        customer_shipped = self.client.get("/api/orders/?user_id=7")
+        self.assertEqual(customer_shipped.status_code, 200)
+        self.assertEqual(customer_shipped.json()["orders"][0]["shipping_status"], Order.SHIPPING_SHIPPED)
 
         delivered_response = self.client.post(
             f"/api/staff/orders/{order['id']}/shipping/",
             data=json.dumps({"shipping_status": Order.SHIPPING_DELIVERED}),
             content_type="application/json",
         )
-        self.assertEqual(delivered_response.status_code, 400)
-        self.assertEqual(
-            delivered_response.json()["error"],
-            "Cannot move shipping from preparing to delivered.",
-        )
+        self.assertEqual(delivered_response.status_code, 200)
+        customer_delivered = self.client.get("/api/orders/?user_id=7")
+        self.assertEqual(customer_delivered.status_code, 200)
+        self.assertEqual(customer_delivered.json()["orders"][0]["shipping_status"], Order.SHIPPING_DELIVERED)
 
     def test_cancelled_shipping_order_cannot_be_paid(self):
         order = self._checkout_order()

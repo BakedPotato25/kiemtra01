@@ -14,6 +14,11 @@ from .rag_kb import rag_citations_from_docs, retrieve_rag_context
 
 _RUNTIME_CONFIG_PATH = Path(__file__).resolve().parent / "artifacts" / "runtime_config.json"
 _RUNTIME_SWITCHABLE_PROVIDERS = {"gemma", "gemini"}
+_GOOGLE_KEY_BLOCKED_MARKERS = (
+    "api key was reported as leaked",
+    "api_key_service_blocked",
+    "api key not valid",
+)
 
 
 def _read_runtime_config():
@@ -370,6 +375,20 @@ def _build_prompt(question, recommendations, user_context, behavior_signal, rag_
     )
 
 
+def _google_error_code(response, error_prefix):
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+
+    error = data.get("error") if isinstance(data, dict) else {}
+    message = str((error or {}).get("message") or "").lower()
+    status = str((error or {}).get("status") or "").lower()
+    if response.status_code == 403 and any(marker in message or marker in status for marker in _GOOGLE_KEY_BLOCKED_MARKERS):
+        return f"{error_prefix}_key_blocked_http_403"
+    return f"{error_prefix}_http_{response.status_code}"
+
+
 def _call_google_model(prompt_text, model_env_name, default_model, timeout_env_name, error_prefix, max_output_tokens=320):
     api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
     if not api_key:
@@ -390,7 +409,7 @@ def _call_google_model(prompt_text, model_env_name, default_model, timeout_env_n
     except requests.RequestException:
         return None, "network_error"
     if not response.ok:
-        return None, f"{error_prefix}_http_{response.status_code}"
+        return None, _google_error_code(response, error_prefix)
 
     try:
         data = response.json()
@@ -465,8 +484,7 @@ def _call_openrouter_gemma(prompt_text, max_output_tokens=320):
     return (answer, None) if answer else (None, "empty_text")
 
 
-def _call_llm(prompt_text, max_output_tokens=320):
-    provider = get_active_llm_provider()
+def _call_llm_candidate(provider, prompt_text, max_output_tokens):
     if provider == "gemini":
         answer, error_code = _call_gemini(prompt_text, max_output_tokens=max_output_tokens)
         return answer, error_code, "gemini"
@@ -477,6 +495,27 @@ def _call_llm(prompt_text, max_output_tokens=320):
         answer, error_code = _call_openrouter_gemma(prompt_text, max_output_tokens=max_output_tokens)
         return answer, error_code, "gemma_openrouter"
     return None, "unsupported_llm_provider", "rule_based"
+
+
+def _call_llm(prompt_text, max_output_tokens=320):
+    active_provider = get_active_llm_provider()
+    provider_order = [active_provider]
+    for provider in ("gemma", "gemini", "openrouter"):
+        if provider not in provider_order:
+            provider_order.append(provider)
+
+    first_error = None
+    for provider in provider_order:
+        answer, error_code, source = _call_llm_candidate(provider, prompt_text, max_output_tokens)
+        if answer:
+            return answer, None, source
+        if not first_error:
+            first_error = (error_code, source)
+        if error_code and "key_blocked" in error_code:
+            continue
+
+    error_code, source = first_error or ("unsupported_llm_provider", "rule_based")
+    return None, error_code, source
 
 
 def _sanitize_llm_answer(answer_text):
@@ -553,28 +592,31 @@ def _build_focused_answer(llm_answer, recommendations, language):
 def _fallback_answer(recommendations, language, error_code=None):
     error_code = (error_code or "").strip().lower()
     rate_limited = error_code.endswith("_http_429")
+    key_blocked = "key_blocked" in error_code
     if language == "vi":
-        if rate_limited:
-            head = "LLM dang vuot gioi han quota/rate-limit (429), tam thoi chuyen sang fallback mode."
+        if key_blocked:
+            head = "API key Google AI dang bi chan, nen minh tam dung goi y tu catalog."
+        elif rate_limited:
+            head = "LLM dang cham gioi han rate/quota, nen minh tam dung goi y tu catalog."
         elif error_code in {"missing_api_key", "missing_openrouter_api_key"}:
-            head = "Chua cau hinh API key cho LLM provider, tam thoi chuyen sang fallback mode."
+            head = "Chua cau hinh API key cho LLM provider, nen minh tam dung goi y tu catalog."
         else:
-            head = "Minh dang o fallback mode (LLM unavailable), nhung van co the goi y nhanh cho ban."
+            head = "LLM hien chua phan hoi, minh tam dung goi y tu catalog."
         if recommendations:
-            lines = [f"- {item['name']} ({item['category_name']}, {item.get('brand') or 'N/A'}, ${item['price']}, ton kho {item['stock']})" for item in recommendations[:5]]
-            return head + "\n\nGoi y phu hop:\n" + "\n".join(lines)
+            return head + "\n\nCac lua chon phu hop da duoc hien thi ben duoi."
         return head + "\n\nHien tai chua tim thay san pham phu hop."
 
-    if rate_limited:
-        head = "LLM provider is currently rate-limited or quota-limited (429), so fallback mode is being used temporarily."
+    if key_blocked:
+        head = "The Google AI API key is blocked, so I am using catalog recommendations for now."
+    elif rate_limited:
+        head = "The LLM is currently rate-limited, so I am using catalog recommendations for now."
     elif error_code in {"missing_api_key", "missing_openrouter_api_key"}:
-        head = "LLM API key is missing, so fallback mode is being used."
+        head = "The LLM API key is missing, so I am using catalog recommendations."
     else:
-        head = "I am using fallback mode (LLM unavailable), but I can still suggest products."
+        head = "The LLM is unavailable, so I am using catalog recommendations."
 
     if recommendations:
-        lines = [f"- {item['name']} ({item['category_name']}, {item.get('brand') or 'N/A'}, ${item['price']}, stock {item['stock']})" for item in recommendations[:5]]
-        return head + "\n\nRecommended options:\n" + "\n".join(lines)
+        return head + "\n\nRelevant options are shown below."
     return head + "\n\nI could not find a good match yet."
 
 

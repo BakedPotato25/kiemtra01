@@ -88,7 +88,7 @@ class ShippingServiceTests(TestCase):
         self.assertEqual(delivered_response.status_code, 200)
         self.assertEqual(delivered_response.json()["status"], Shipment.STATUS_DELIVERED)
 
-    def test_shipment_rejects_invalid_transition(self):
+    def test_shipment_accepts_forward_status_jumps(self):
         create_response = self.client.post("/api/shipments/", self._payload(order_id=404), format="json")
         shipment_id = create_response.json()["id"]
 
@@ -97,10 +97,18 @@ class ShippingServiceTests(TestCase):
             {"status": Shipment.STATUS_DELIVERED},
             format="json",
         )
-        self.assertEqual(delivered_response.status_code, 400)
+        self.assertEqual(delivered_response.status_code, 200)
+        self.assertEqual(delivered_response.json()["status"], Shipment.STATUS_DELIVERED)
+
+        shipped_response = self.client.patch(
+            f"/api/shipments/{shipment_id}/status/",
+            {"status": Shipment.STATUS_SHIPPED},
+            format="json",
+        )
+        self.assertEqual(shipped_response.status_code, 400)
         self.assertEqual(
-            delivered_response.json()["error"],
-            "Cannot move shipment from pending to delivered.",
+            shipped_response.json()["error"],
+            "Cannot move shipment from delivered to shipped.",
         )
 
     def test_cancelled_shipment_is_terminal(self):

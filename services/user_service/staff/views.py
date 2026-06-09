@@ -187,14 +187,14 @@ def staff_register_view(request):
     return render(request, "staff/register.html", {"form": form})
 
 
-@login_required
+@login_required(login_url="staff_login")
 def staff_logout_view(request):
     logout(request)
     return redirect("staff_login")
 
 
-@login_required
-@user_passes_test(_is_staff_user)
+@login_required(login_url="staff_login")
+@user_passes_test(_is_staff_user, login_url="staff_login")
 @require_http_methods(["GET"])
 def staff_dashboard_view(request):
     range_days = _to_int(request.GET.get("range")) or 30
@@ -207,8 +207,8 @@ def staff_dashboard_view(request):
     return render(request, "staff/dashboard.html", context)
 
 
-@login_required
-@user_passes_test(_is_staff_user)
+@login_required(login_url="staff_login")
+@user_passes_test(_is_staff_user, login_url="staff_login")
 @require_http_methods(["GET"])
 def staff_customers_view(request):
     range_days = _to_int(request.GET.get("range")) or 30
@@ -237,8 +237,8 @@ def staff_customers_view(request):
     return render(request, "staff/customers.html", context)
 
 
-@login_required
-@user_passes_test(_is_staff_user)
+@login_required(login_url="staff_login")
+@user_passes_test(_is_staff_user, login_url="staff_login")
 @require_http_methods(["GET", "POST"])
 def staff_items_view(request):
     categories = fetch_categories()
@@ -313,8 +313,8 @@ def staff_items_view(request):
     return render(request, "staff/items.html", context)
 
 
-@login_required
-@user_passes_test(_is_staff_user)
+@login_required(login_url="staff_login")
+@user_passes_test(_is_staff_user, login_url="staff_login")
 def staff_orders_view(request):
     if request.method == "POST":
         order_id = _to_int(request.POST.get("order_id"))
@@ -341,8 +341,8 @@ def staff_orders_view(request):
     )
 
 
-@login_required
-@user_passes_test(_is_staff_user)
+@login_required(login_url="staff_login")
+@user_passes_test(_is_staff_user, login_url="staff_login")
 @require_http_methods(["GET"])
 def staff_customer_detail_view(request, user_id):
     customer = get_object_or_404(User, id=user_id, is_staff=False, is_superuser=False)
@@ -365,8 +365,8 @@ def staff_customer_detail_view(request, user_id):
     )
 
 
-@login_required
-@user_passes_test(_is_staff_user)
+@login_required(login_url="staff_login")
+@user_passes_test(_is_staff_user, login_url="staff_login")
 @require_http_methods(["GET", "POST"])
 def staff_customer_edit_view(request, user_id):
     customer = get_object_or_404(User, id=user_id, is_staff=False, is_superuser=False)
@@ -400,8 +400,8 @@ def staff_customer_edit_view(request, user_id):
     return render(request, "staff/customer_edit.html", {"customer": customer, "form": form})
 
 
-@login_required
-@user_passes_test(_is_staff_user)
+@login_required(login_url="staff_login")
+@user_passes_test(_is_staff_user, login_url="staff_login")
 @require_POST
 def staff_customer_toggle_active_view(request, user_id):
     customer = get_object_or_404(User, id=user_id, is_staff=False, is_superuser=False)
@@ -412,8 +412,8 @@ def staff_customer_toggle_active_view(request, user_id):
     return redirect("staff_customer_detail", user_id=user_id)
 
 
-@login_required
-@user_passes_test(_is_staff_user)
+@login_required(login_url="staff_login")
+@user_passes_test(_is_staff_user, login_url="staff_login")
 @require_POST
 def staff_customer_reset_password_view(request, user_id):
     customer = get_object_or_404(User, id=user_id, is_staff=False, is_superuser=False)

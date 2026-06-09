@@ -55,9 +55,49 @@
   const appendMessage = (log, role, text) => {
     const article = document.createElement("article");
     article.className = `assist-msg assist-msg-${role}`;
-    const paragraph = document.createElement("p");
-    paragraph.textContent = text;
-    article.appendChild(paragraph);
+    const bubble = document.createElement("div");
+    bubble.className = "assist-msg-bubble";
+
+    if (role === "assistant") {
+      const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+      let list = null;
+
+      lines.forEach((rawLine) => {
+        const line = rawLine.trim();
+        if (!line) {
+          list = null;
+          return;
+        }
+
+        if (/^[-*]\s+/.test(line)) {
+          if (!list) {
+            list = document.createElement("ul");
+            bubble.appendChild(list);
+          }
+          const item = document.createElement("li");
+          item.textContent = line.replace(/^[-*]\s+/, "");
+          list.appendChild(item);
+          return;
+        }
+
+        list = null;
+        const paragraph = document.createElement("p");
+        paragraph.textContent = line;
+        bubble.appendChild(paragraph);
+      });
+
+      if (!bubble.childNodes.length) {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = "No response generated.";
+        bubble.appendChild(paragraph);
+      }
+    } else {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = text;
+      bubble.appendChild(paragraph);
+    }
+
+    article.appendChild(bubble);
     log.appendChild(article);
     log.scrollTop = log.scrollHeight;
     return article;

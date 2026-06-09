@@ -8,6 +8,11 @@ User = get_user_model()
 
 
 class StaffLoginTests(TestCase):
+    def test_staff_dashboard_redirects_anonymous_users_to_staff_login(self):
+        response = self.client.get(reverse("staff_dashboard"))
+
+        self.assertRedirects(response, "/staff/login/?next=/staff/dashboard/")
+
     def test_staff_login_rejects_superuser_accounts(self):
         User.objects.create_superuser(
             username="root",

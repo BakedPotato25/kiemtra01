@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 from django.core.management import call_command
 from django.test import Client, TestCase
 
+from . import services
 from .behavior_ai import predict_behavior_for_user_ref, record_behavior_event, train_and_save_behavior_model
 from .behavior_graph import build_behavior_graph_payload
 from .category_taxonomy import detect_category_matches
@@ -534,7 +535,70 @@ class ChatbotReplyFlowTests(TestCase):
         self.assertEqual(payload["error_code"], "network_error")
         self.assertEqual(payload["recommendations"][0]["category_slug"], "tablets")
         self.assertEqual(payload["citations"], [])
-        self.assertIn("fallback mode", payload["answer"])
+        self.assertIn("catalog recommendations", payload["answer"])
+
+    def test_chat_reply_view_reports_blocked_google_key_without_duplicating_product_list(self):
+        graph_retriever = Mock()
+        graph_retriever.fetch_context.return_value = {"available": False, "status": "empty", "docs": [], "product_ids": [], "error": None}
+        graph_retriever.close.return_value = None
+        recommendations = [
+            {
+                "service": "smartphones",
+                "category_slug": "smartphones",
+                "category_name": "Smartphones",
+                "id": 33,
+                "name": "Galaxy Orbit S",
+                "brand": "Samsung",
+                "description": "Balanced Android flagship.",
+                "price": "999.00",
+                "stock": 30,
+                "image_url": "",
+            }
+        ]
+
+        with patch("chatbot.behavior_ai.fetch_catalog_categories", return_value=RUNTIME_CATEGORIES), patch(
+            "chatbot.services.fetch_catalog_categories",
+            return_value=RUNTIME_CATEGORIES,
+        ), patch(
+            "chatbot.services.BehaviorGraphRetriever",
+            return_value=graph_retriever,
+        ), patch("chatbot.services._fetch_products", return_value=recommendations), patch(
+            "chatbot.services.retrieve_rag_context",
+            return_value=[],
+        ), patch(
+            "chatbot.services._call_llm",
+            return_value=(None, "gemini_key_blocked_http_403", "gemini"),
+        ):
+            response = self.client.post(
+                "/api/chat/reply/",
+                data=json.dumps({"message": "Goi y dien thoai con hang", "user_ref": "blocked-key-user"}),
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["fallback_used"])
+        self.assertEqual(payload["error_code"], "gemini_key_blocked_http_403")
+        self.assertIn("API key Google AI dang bi chan", payload["answer"])
+        self.assertNotIn("Galaxy Orbit S", payload["answer"])
+        self.assertEqual(payload["recommendations"][0]["name"], "Galaxy Orbit S")
+
+    def test_call_llm_tries_secondary_provider_before_fallback(self):
+        with patch("chatbot.services.get_active_llm_provider", return_value="gemini"), patch(
+            "chatbot.services._call_gemini",
+            return_value=(None, "gemini_http_429"),
+        ), patch(
+            "chatbot.services._call_google_gemma",
+            return_value=("Gemma answer", None),
+        ), patch(
+            "chatbot.services._call_openrouter_gemma",
+        ) as openrouter_mock:
+            answer, error_code, source = services._call_llm("prompt", max_output_tokens=64)
+
+        self.assertEqual(answer, "Gemma answer")
+        self.assertIsNone(error_code)
+        self.assertEqual(source, "gemma_4_31b")
+        openrouter_mock.assert_not_called()
 
 
 class BehaviorDatasetGenerationTests(TestCase):

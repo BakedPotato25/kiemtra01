@@ -11,6 +11,23 @@ DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
+_default_csrf_trusted_origins = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8003",
+    "http://127.0.0.1:8003",
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        ",".join(_default_csrf_trusted_origins),
+    ).split(",")
+    if origin.strip()
+]
+
 
 # Application definition
 
@@ -29,13 +46,16 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    'config.middleware.ScopedSessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+CUSTOMER_SESSION_COOKIE_NAME = os.getenv("CUSTOMER_SESSION_COOKIE_NAME", "customer_sessionid")
+STAFF_SESSION_COOKIE_NAME = os.getenv("STAFF_SESSION_COOKIE_NAME", "staff_sessionid")
 
 ROOT_URLCONF = 'config.urls'
 

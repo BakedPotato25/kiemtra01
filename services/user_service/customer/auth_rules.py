@@ -25,7 +25,11 @@ def role_scopes_from_sources(*, source_names=(), is_staff=False, is_superuser=Fa
 
 
 def can_access_customer(user):
-    return bool(getattr(user, "is_authenticated", False) and not getattr(user, "is_superuser", False))
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and not getattr(user, "is_staff", False)
+        and not getattr(user, "is_superuser", False)
+    )
 
 
 def can_access_staff(user):

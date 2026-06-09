@@ -989,6 +989,25 @@ a   { color: inherit; text-decoration: none; }
 .order-date { color: var(--muted); font-size: 12px; }
 .order-total { font-size: 18px; font-weight: 800; color: var(--accent); }
 .order-items-wrap { padding: 8px 0; }
+.order-status-pair {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.order-status-unit {
+  display: grid;
+  gap: 4px;
+  min-width: 96px;
+}
+.order-status-label {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  text-transform: uppercase;
+}
 
 /* Status badges */
 .badge-status {
@@ -1193,7 +1212,7 @@ a   { color: inherit; text-decoration: none; }
   max-height: 340px;
 }
 .assist-msg { display: flex; }
-.assist-msg p {
+.assist-msg-bubble {
   margin: 0;
   max-width: 88%;
   padding: 10px 14px;
@@ -1201,12 +1220,29 @@ a   { color: inherit; text-decoration: none; }
   font-size: 13px;
   line-height: 1.5;
 }
-.assist-msg-assistant p {
+.assist-msg-bubble p {
+  margin: 0;
+}
+.assist-msg-bubble p + p,
+.assist-msg-bubble p + ul,
+.assist-msg-bubble ul + p {
+  margin-top: 8px;
+}
+.assist-msg-bubble ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 5px;
+}
+.assist-msg-bubble li {
+  padding-left: 2px;
+}
+.assist-msg-assistant .assist-msg-bubble {
   background: var(--surface-2);
   color: var(--text);
 }
 .assist-msg-user { justify-content: flex-end; }
-.assist-msg-user p {
+.assist-msg-user .assist-msg-bubble {
   background: var(--accent);
   color: #041108;
   font-weight: 700;

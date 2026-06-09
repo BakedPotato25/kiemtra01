@@ -260,9 +260,10 @@ def customer_login_view(request):
             messages.error(request, "Admin accounts should sign in via /admin/.")
             return render(request, "customer/login.html", {"form": form})
 
-        login(request, user)
         if user.is_staff:
-            return redirect("staff_dashboard")
+            messages.error(request, "Staff accounts should sign in via /staff/login/.")
+            return redirect("staff_login")
+        login(request, user)
         return redirect("customer_dashboard")
 
     return render(request, "customer/login.html", {"form": form})
