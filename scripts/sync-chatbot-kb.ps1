@@ -1,50 +1,111 @@
 param(
     [int]$MaxProducts = 160,
-    [switch]$KeepCustomerCopy,
     [switch]$SkipBehaviorTrain
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "[1/6] Building chatbot KB inside container..."
-docker compose exec chatbot_service python manage.py build_chat_kb --max-products $MaxProducts
+function Invoke-DockerCompose {
+    param([string[]]$ComposeArgs)
 
-if (-not $SkipBehaviorTrain) {
-    Write-Host "[2/6] Training behavior model inside container..."
-    docker compose exec chatbot_service python manage.py train_behavior_model --epochs 120 --lr 0.02
-} else {
-    Write-Host "[2/6] Skipping behavior model training (SkipBehaviorTrain=true)."
+    & docker compose @ComposeArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw ("docker compose {0} failed with exit code {1}" -f ($ComposeArgs -join " "), $LASTEXITCODE)
+    }
 }
 
-Write-Host "[3/6] Ensuring local chatbot artifacts folder exists..."
+function Get-ArtifactState {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return @{
+            Exists = $false
+            LastWriteTimeUtc = $null
+        }
+    }
+
+    $item = Get-Item $Path
+    return @{
+        Exists = $true
+        LastWriteTimeUtc = $item.LastWriteTimeUtc
+    }
+}
+
+function Describe-ArtifactStateChange {
+    param(
+        [string]$Path,
+        [hashtable]$BeforeState
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Expected artifact was not found on host path: $Path"
+    }
+
+    $item = Get-Item $Path
+    if (-not $BeforeState.Exists) {
+        return "created"
+    }
+
+    if ($item.LastWriteTimeUtc -gt $BeforeState.LastWriteTimeUtc) {
+        return "updated"
+    }
+
+    return "unchanged"
+}
+
 $chatbotArtifacts = "services/chatbot_service/chatbot/artifacts"
 if (-not (Test-Path $chatbotArtifacts)) {
     New-Item -Path $chatbotArtifacts -ItemType Directory -Force | Out-Null
 }
 
-Write-Host "[4/6] Syncing knowledge_base.json to local chatbot_service..."
-docker compose cp chatbot_service:/app/chatbot/artifacts/knowledge_base.json "$chatbotArtifacts/knowledge_base.json"
-
-Write-Host "[5/6] Syncing model_behavior.json to local chatbot_service..."
-docker compose cp chatbot_service:/app/chatbot/artifacts/model_behavior.json "$chatbotArtifacts/model_behavior.json"
-
-$customerArtifacts = "services/customer_service/customer/artifacts"
-$customerKb = "$customerArtifacts/knowledge_base.json"
-if (-not $KeepCustomerCopy) {
-    Write-Host "[6/6] Removing customer_service KB copy for strict separation..."
-    if (Test-Path $customerKb) {
-        Remove-Item $customerKb -Force
-    }
-    if (Test-Path $customerArtifacts) {
-        $remaining = Get-ChildItem -Path $customerArtifacts -ErrorAction SilentlyContinue
-        if (-not $remaining) {
-            Remove-Item $customerArtifacts -Force
-        }
-    }
-} else {
-    Write-Host "[6/6] Keeping customer_service KB copy as requested."
+$artifactTargets = @(
+    "knowledge_base.json",
+    "model_behavior.json",
+    "training_data_behavior.json"
+)
+$artifactStateBefore = @{}
+foreach ($artifactName in $artifactTargets) {
+    $artifactStateBefore[$artifactName] = Get-ArtifactState -Path (Join-Path $chatbotArtifacts $artifactName)
 }
 
-Write-Host "Done. Artifacts synced:"
-Write-Host "- $chatbotArtifacts/knowledge_base.json"
-Write-Host "- $chatbotArtifacts/model_behavior.json"
+Write-Host "[1/4] Building chatbot KB inside container..."
+Invoke-DockerCompose -ComposeArgs @(
+    "exec",
+    "chatbot_service",
+    "python",
+    "manage.py",
+    "build_chat_kb",
+    "--max-products",
+    "$MaxProducts"
+)
+
+if (-not $SkipBehaviorTrain) {
+    Write-Host "[2/4] Training behavior model inside container..."
+    Invoke-DockerCompose -ComposeArgs @(
+        "exec",
+        "chatbot_service",
+        "python",
+        "manage.py",
+        "train_behavior_model"
+    )
+} else {
+    Write-Host "[2/4] Skipping behavior model training (SkipBehaviorTrain=true)."
+}
+
+Write-Host "[3/4] Verifying bind-mounted artifacts on host..."
+foreach ($artifactName in $artifactTargets) {
+    $artifactPath = Join-Path $chatbotArtifacts $artifactName
+    $status = Describe-ArtifactStateChange -Path $artifactPath -BeforeState $artifactStateBefore[$artifactName]
+    $item = Get-Item $artifactPath
+    Write-Host ("- {0} [{1}] last_write_utc={2}" -f $artifactPath, $status, $item.LastWriteTimeUtc.ToString("s"))
+}
+
+$runtimeConfigPath = Join-Path $chatbotArtifacts "runtime_config.json"
+if (Test-Path $runtimeConfigPath) {
+    $runtimeConfigItem = Get-Item $runtimeConfigPath
+    Write-Host ("- {0} [present] last_write_utc={1}" -f $runtimeConfigPath, $runtimeConfigItem.LastWriteTimeUtc.ToString("s"))
+} else {
+    Write-Host ("- {0} [optional_missing]" -f $runtimeConfigPath)
+}
+
+Write-Host "[4/4] Artifact workflow completed on bind mount."

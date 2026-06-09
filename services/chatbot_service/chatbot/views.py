@@ -22,8 +22,7 @@ def _safe_int(value, default=0):
 
 
 def _parse_request_payload(request):
-    content_type = (request.content_type or "").lower()
-    if "application/json" in content_type:
+    if "application/json" in (request.content_type or "").lower():
         try:
             return json.loads(request.body.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -36,16 +35,15 @@ def _extract_current_product(payload):
     if not isinstance(current_product, dict):
         return None
 
-    service = str(current_product.get("service") or "").strip().lower()
-    if service not in {"laptop", "mobile", "accessory"}:
-        return None
-
+    category_slug = str(current_product.get("category_slug") or current_product.get("service") or "").strip().lower()
     product_id = _safe_int(current_product.get("id"), 0)
-    if product_id <= 0:
+    if not category_slug or product_id <= 0:
         return None
 
     return {
-        "service": service,
+        "category_slug": category_slug,
+        "category_name": str(current_product.get("category_name") or "").strip()[:120],
+        "service": category_slug,
         "id": product_id,
         "name": str(current_product.get("name") or "").strip()[:255],
         "brand": str(current_product.get("brand") or "").strip()[:120],
@@ -76,9 +74,7 @@ def chat_reply_view(request):
     if not message:
         return JsonResponse({"error": "Message is required."}, status=400)
 
-    if len(message) > 500:
-        message = message[:500]
-
+    message = message[:500]
     control_action, control_provider = parse_provider_control_command(message)
     if control_action == "show":
         active_provider = get_active_llm_provider()
@@ -98,7 +94,6 @@ def chat_reply_view(request):
         active_provider = set_active_llm_provider(control_provider)
         if not active_provider:
             return JsonResponse({"error": "Unable to switch provider right now."}, status=500)
-
         return JsonResponse(
             {
                 "answer": f"Da chuyen provider sang {active_provider}. Tin nhan tiep theo se dung model nay.",
@@ -111,19 +106,13 @@ def chat_reply_view(request):
             }
         )
 
-    current_product = _extract_current_product(payload)
-    user_context = payload.get("user_context") if isinstance(payload.get("user_context"), dict) else {}
-    user_ref = str(payload.get("user_ref") or "").strip() or "anonymous"
-    limit = max(1, min(8, _safe_int(payload.get("limit"), 5)))
-
     result = generate_chatbot_response(
         question=message,
-        current_product=current_product,
-        user_context=user_context,
-        user_ref=user_ref,
-        limit=limit,
+        current_product=_extract_current_product(payload),
+        user_context=_extract_user_context(payload),
+        user_ref=str(payload.get("user_ref") or "").strip() or "anonymous",
+        limit=max(1, min(8, _safe_int(payload.get("limit"), 5))),
     )
-
     return JsonResponse(result)
 
 
@@ -141,18 +130,10 @@ def ingest_behavior_event_view(request):
     if not message:
         return JsonResponse({"error": "Message is required."}, status=400)
 
-    if len(message) > 500:
-        message = message[:500]
-
-    current_product = _extract_current_product(payload)
-    user_context = _extract_user_context(payload)
-    user_ref = str(payload.get("user_ref") or "").strip() or "anonymous"
-
     record_behavior_event(
-        user_ref=user_ref,
-        message=message,
-        current_product=current_product,
-        user_context=user_context,
+        user_ref=str(payload.get("user_ref") or "").strip() or "anonymous",
+        message=message[:500],
+        current_product=_extract_current_product(payload),
+        user_context=_extract_user_context(payload),
     )
-
     return JsonResponse({"status": "ok"})

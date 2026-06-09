@@ -1,1 +1,0 @@
-"""API gateway registry package."""

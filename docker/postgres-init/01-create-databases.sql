@@ -1,3 +1,4 @@
-CREATE DATABASE laptop_db;
-CREATE DATABASE mobile_db;
-CREATE DATABASE accessory_db;
+CREATE DATABASE product_db;
+CREATE DATABASE chatbot_db;
+CREATE DATABASE payment_db;
+CREATE DATABASE shipping_db;

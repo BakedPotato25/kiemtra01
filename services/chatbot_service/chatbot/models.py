@@ -9,7 +9,7 @@ class BehaviorEvent(models.Model):
 
     user_ref = models.CharField(max_length=120, db_index=True)
     event_type = models.CharField(max_length=40, choices=EVENT_CHOICES)
-    product_service = models.CharField(max_length=20, blank=True)
+    category_slug = models.CharField(max_length=120, blank=True)
     product_id = models.PositiveIntegerField(default=0)
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
