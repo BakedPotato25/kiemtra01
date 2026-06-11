@@ -1,8 +1,12 @@
-# kiemtra01 - 6-Service Django Commerce
+# Final Essay - Django Commerce Microservices and AI
 
 ## 1. Overview
 
-This repo now runs a 6-service architecture:
+This repository is the final essay implementation package for the Software Architecture and Design course. The essay topic is building an e-commerce system using microservices and AI, with Docker Compose, Django services, an Nginx gateway, database-per-service storage, and an AI chatbot/recommendation service.
+
+The implementation follows the final essay structure in `EssayV1/tieuluan_Monhoc_KientrucThietke_PM_04-2026.pdf`: monolithic architecture, microservices, Domain Driven Design, e-commerce service decomposition, AI service design, and complete-system deployment.
+
+This repo runs a 6-service architecture:
 
 - `user_service`: shared auth source, customer/staff web UI, gateway/orchestrator, editorial content, chatbot proxy.
 - `product_service`: unified catalog API with 10 categories and 100 seeded products.
@@ -15,7 +19,7 @@ Databases:
 
 - MySQL: `user_service`, `order_service`
 - PostgreSQL: `product_service`, `chatbot_service`, `payment_service`, `shipping_service`
-- Neo4j: optional behavior knowledge graph for `chatbot_service` Phase 4/5 retrieval
+- Neo4j: optional behavior knowledge graph for `chatbot_service` behavior-context retrieval
 
 Public entry points:
 
@@ -26,9 +30,25 @@ Public entry points:
 - Chatbot API direct debug port: `http://localhost:8005/api/`
 - Neo4j Browser: `http://localhost:7474/`
 
+API gateway decision:
+
+- There is no standalone Django service named `api_gateway`.
+- The public reverse proxy is the Docker Compose service `gateway`, backed by `docker/gateway/nginx.conf`.
+- Application-level gateway metadata and orchestration live in `user_service`, under `services/user_service/customer/api_gateway/`.
+- A new `api_gateway` service is not needed for the current architecture because Nginx handles public path routing and `user_service` owns browser auth/session orchestration.
+
+Final essay package:
+
+- Main report source: `EssayV1/essay_from_toc.tex`
+- Reference report structure: `EssayV1/tieuluan_Monhoc_KientrucThietke_PM_04-2026.pdf`
+- Final diagram upload folder for Overleaf: `EssayV1/final_diagram_images/`
+- Image upload checklist: `EssayV1/images_to_upload.md`
+- Demo runbook: `DEMO_RUNBOOK.md`
+- Gateway URL index: `docker/gateway/README.md`
+
 ## 2. Service Matrix
 
-Target runtime architecture after the gateway/JWT/payment/shipping cutover:
+Current final runtime architecture:
 
 | Service | Role | DB | Host Port |
 |---|---|---|---:|
@@ -40,6 +60,16 @@ Target runtime architecture after the gateway/JWT/payment/shipping cutover:
 | `shipping_service` | Shipment records and shipping status lifecycle | PostgreSQL `shipping_db` | internal |
 | `chatbot_service` | Chatbot + RAG + behavior persistence | PostgreSQL `chatbot_db` | `8005` |
 | `neo4j` | Behavior graph KB for chatbot context queries | Neo4j graph store | `7474`, `7687` |
+
+Service README index:
+
+- `services/user_service/README.md`
+- `services/product_service/README.md`
+- `services/order_service/README.md`
+- `services/payment_service/README.md`
+- `services/shipping_service/README.md`
+- `services/chatbot_service/README.md`
+- `docker/gateway/README.md`
 
 ## 3. Key Contracts
 
@@ -85,7 +115,7 @@ Dedicated gateway code now lives in:
 
 The HTML inspection page is available at `/gateway/` and the JSON index is available at `/gateway/apis/`.
 
-Nginx gateway routing lives in `docker/gateway/nginx.conf` and is exposed on `http://localhost:8080/` as the primary public entrypoint without removing the direct debug ports above. It routes `/`, `/customer/`, `/staff/`, `/admin/`, `/gateway/`, and `/api/auth/` to `user-service`; `/api/products/` and `/api/categories/` to `product-service`; `/api/cart/` and `/api/orders/` to `order-service`; `/api/payments/` to `payment-service`; `/api/shipments/` to `shipping-service`; `/api/chat/` to `chatbot-service`.
+Nginx gateway routing lives in `docker/gateway/nginx.conf` and is exposed on `http://localhost:8080/` as the primary public entrypoint without removing the direct debug ports above. It routes `/`, `/customer/`, `/staff/`, `/admin/`, `/gateway/`, and `/api/auth/` to `user-service`; `/api/products/` and `/api/categories/` to `product-service`; `/api/cart/`, `/api/saved/`, `/api/compare/`, `/api/checkout/`, `/api/orders/`, `/api/staff/orders/`, `/api/analytics/`, and `/api/internal/` to `order-service`; `/api/payments/` to `payment-service`; `/api/shipments/` to `shipping-service`; `/api/chat/` to `chatbot-service`.
 
 ## 4. Environment
 
@@ -113,7 +143,7 @@ Important variables:
 - `STAFF_API_KEY`
 - `CHATBOT_INGEST_KEY`
 - `LLM_PROVIDER`, `GEMMA_MODEL`, `GEMINI_API_KEY`, `CHATBOT_GEMINI_MODEL`
-- Phase 5 runtime artifacts in `services/chatbot_service/chatbot/artifacts/`: `model_best.keras`, `label_encoder.json`, `tokenizer_or_vocab.json`
+- AI runtime artifacts in `services/chatbot_service/chatbot/artifacts/`: `model_best.keras`, `label_encoder.json`, `tokenizer_or_vocab.json`
 
 ## 5. Runbook
 
@@ -180,7 +210,7 @@ Neo4j graph notes:
 - Default login from `.env.example`: user `neo4j`, password `graph_password`
 - Demo graph image is written to `services/chatbot_service/chatbot/artifacts/behavior_graph_demo.svg`
 - Cypher samples and schema notes live in `docs/neo4j_behavior_graph.md`
-- `chatbot_service` still starts and `/api/chat/reply/` still works when Neo4j is unavailable; Phase 5 falls back to file-based RAG automatically.
+- `chatbot_service` still starts and `/api/chat/reply/` still works when Neo4j is unavailable; chatbot retrieval falls back to file-based RAG automatically.
 
 ## 7. Legacy Migration
 
@@ -231,7 +261,34 @@ docker compose exec user_service python manage.py backfill_chatbot_behavior
   - `neo4j` on `7474` and `7687`
 - No runtime env or Docker hostname references remain for `customer_service`, `staff_service`, `laptop_service`, `mobile_service`, or `accessory_service`.
 
-## 9. Smoke Commands
+## 9. Latest Verification
+
+Last full verification: June 11, 2026.
+
+Verified commands:
+
+- `docker compose config --quiet`
+- `docker compose up --build -d`
+- `docker compose ps -a`
+- `docker compose logs --tail=120` for gateway and all six Django services
+- `docker compose exec -T product_service python manage.py seed_products`
+- `docker compose exec -T user_service python manage.py seed_editorial_content`
+- `docker compose exec -T chatbot_service python manage.py build_chat_kb --max-products 160`
+- `docker compose exec -T chatbot_service python manage.py train_behavior_model`
+- `docker compose exec -T chatbot_service python manage.py import_behavior_graph --reset`
+
+Service tests passed:
+
+- `user_service`: `python manage.py test customer staff` - 28 tests
+- `product_service`: `python manage.py test catalog` - 6 tests
+- `order_service`: `python manage.py test orders` - 11 tests
+- `payment_service`: `python manage.py test payments` - 5 tests
+- `shipping_service`: `python manage.py test shipments` - 6 tests
+- `chatbot_service`: `python manage.py test chatbot` - 15 tests
+
+Gateway smoke passed through `http://localhost:8080` with smoke `user_id=62`, `order_id=145`, and `product_id=1`. The smoke covered gateway registry, catalog, JWT auth, saved items, compare, cart, checkout, payment record lookup, shipment record lookup, pay order, shipping transitions through `preparing`, `shipped`, and `delivered`, order list, analytics, behavior source export, direct chatbot reply, customer analytics proxy, customer session login/pages, customer chatbot proxy, staff registration/login/pages, and staff orders.
+
+## 10. Smoke Commands
 
 PowerShell examples through the primary Nginx gateway on port `8080`:
 
@@ -251,7 +308,7 @@ Use direct service ports (`8000`, `8001`, `8005`) only when debugging a specific
 
 Only remove the legacy service folders after these smoke checks pass for the current target services.
 
-## 10. Chatbot Artifacts
+## 11. Chatbot Artifacts
 
 Host bind-mounted artifacts live under:
 
@@ -264,7 +321,7 @@ Host bind-mounted artifacts live under:
 - `services/chatbot_service/chatbot/artifacts/runtime_config.json`
 - `services/chatbot_service/chatbot/artifacts/behavior_graph_demo.svg`
 
-## 11. Notes
+## 12. Notes
 
 - No service uses SQLite.
 - MySQL/PostgreSQL bootstrap scripts are expected to reconcile reused Docker volumes to `user_db`, `order_db`, `product_db`, `payment_db`, `shipping_db`, and `chatbot_db` without requiring manual volume deletion.
@@ -272,28 +329,32 @@ Host bind-mounted artifacts live under:
 - Legacy orders are preserved as snapshot history and are not forced to relink to the new catalog taxonomy.
 - `user_service` remains the recovery owner for chatbot behavior via `backfill_chatbot_behavior`.
 
-## 12. Phase 6 Demo Flow
+## 13. Final Demo Flow
 
-Phase 6 keeps the customer routes stable and extends the existing e-commerce UI with AI in 3 places:
+The final demo keeps the customer routes stable and shows the e-commerce UI with AI in 3 places:
 
-- `/customer/dashboard/` now renders an `AI goi y cho ban` block above the search results, driven by the Phase 5 chatbot backend and scoped to the current filters/search intent.
-- `/customer/cart/` now renders a `Co the mua kem` block under the active cart, driven by the same chatbot backend and filtered away from products already in the basket.
-- The floating chat widget stays in the existing project style and still posts to `/customer/chatbot/reply/`; only the backend intelligence source is the Phase 5 hybrid chatbot service.
+- `/customer/dashboard/` renders an AI recommendation block above the search results, driven by the hybrid chatbot backend and scoped to the current filters/search intent.
+- `/customer/cart/` renders a buy-together recommendation block under the active cart, driven by the same chatbot backend and filtered away from products already in the basket.
+- The floating chat widget stays in the existing project style and still posts to `/customer/chatbot/reply/`; the backend intelligence source is the hybrid chatbot service.
 
 Recommended live demo order:
 
 1. Start the full stack with `docker compose up --build -d`.
 2. Open `http://localhost:8080/customer/register/` and create a customer account, or sign in with an existing seeded/demo account.
-3. Browse `http://localhost:8080/customer/dashboard/`, search by keyword/category, and capture the `AI goi y cho ban` block together with the matching product results.
-4. Add 1-2 items to cart, open `http://localhost:8080/customer/cart/`, and capture the `Co the mua kem` block.
+3. Browse `http://localhost:8080/customer/dashboard/`, search by keyword/category, and capture the AI recommendation block together with the matching product results.
+4. Add 1-2 items to cart, open `http://localhost:8080/customer/cart/`, and capture the buy-together recommendation block.
 5. Open the existing chat widget, ask for a product suggestion, and capture the widget reply with recommendation cards/citations.
 6. Optionally open Neo4j Browser at `http://localhost:7474/` to show the behavior graph context behind the chatbot retrieval layer.
 
-## 13. Submission Evidence
+## 14. Final Essay Evidence
 
-Use `docs/phase-6-submission-kit.md` as the checklist for the PDF pack. The required evidence already maps to repo artifacts and UI screens:
+Use the files under `EssayV1/` as the final report package. The main report is `EssayV1/essay_from_toc.tex`, and the Overleaf image checklist is `EssayV1/images_to_upload.md`. The required implementation evidence maps to repo artifacts and UI screens:
 
-- Mermaid architecture diagrams: `docs/mermaid-diagrams-v1.md`
+- Final LaTeX report: `EssayV1/essay_from_toc.tex`
+- Reference report structure: `EssayV1/tieuluan_Monhoc_KientrucThietke_PM_04-2026.pdf`
+- Final report diagrams: `EssayV1/final_diagram_images/`
+- Visual Paradigm source diagrams: `EssayV1/Visual Paradigm Diagrams/`
+- Generated architecture diagrams: `EssayV1/generated_diagrams/`
 - 20-row data sample: `services/chatbot_service/chatbot/artifacts/data_user500_sample20.csv`
 - Metric comparison table: `services/chatbot_service/chatbot/artifacts/metrics_comparison.csv`
 - Confusion matrix images: `services/chatbot_service/chatbot/artifacts/confusion_matrix_*.png`

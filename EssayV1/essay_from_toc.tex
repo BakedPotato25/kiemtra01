@@ -1,21 +1,39 @@
+% !TeX program = xelatex
 \documentclass[12pt,a4paper]{article}
 
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
+\usepackage{iftex}
+\ifPDFTeX
+    \usepackage[utf8]{inputenc}
+    \usepackage[T1]{fontenc}
+    \usepackage[english]{babel}
+\else
+    \usepackage{fontspec}
+    \defaultfontfeatures{Ligatures=TeX}
+    \IfFontExistsTF{Noto Serif}
+        {\setmainfont{Noto Serif}}
+        {\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{\setmainfont{Libertinus Serif}}}
+    \IfFontExistsTF{Noto Sans}
+        {\setsansfont{Noto Sans}}
+        {\IfFontExistsTF{Arial}{\setsansfont{Arial}}{\setsansfont{Libertinus Sans}}}
+    \IfFontExistsTF{Consolas}
+        {\setmonofont{Consolas}}
+        {\setmonofont{Latin Modern Mono}}
+\fi
 \usepackage{geometry}
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
+\usepackage{tabularx}
 \usepackage{enumitem}
 \usepackage{hyperref}
 \usepackage{float}
-\usepackage{placeins}
 \usepackage{listings}
 \usepackage{caption}
-\usepackage{subcaption}
-\usepackage{microtype}
+\usepackage{tikz}
+\usepackage[inkscapelatex=false]{svg}
+\svgsetup{inkscapearea=page}
 
 \geometry{left=3cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
 \hypersetup{
@@ -39,19 +57,23 @@
 }
 \lstset{style=reportcode}
 
-\newcommand{\safeincludegraphics}[2][]{%
-  \IfFileExists{#2}{%
-    \includegraphics[#1]{#2}%
-  }{%
-    \fbox{%
-      \begin{minipage}[c][5cm][c]{0.90\linewidth}
-      \centering Missing image: \texttt{\detokenize{#2}}
-      \end{minipage}
+\newcommand{\codepath}[1]{{\small\texttt{#1}}}
+\newcommand{\diagramimage}[2][]{%
+    \IfFileExists{#2.svg}{%
+        \includesvg[#1]{#2}%
+    }{%
+        \IfFileExists{#2.pdf}{%
+            \includegraphics[#1]{#2.pdf}%
+        }{%
+            \includegraphics[#1]{#2.png}%
+        }%
     }%
-  }%
 }
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
 
 \begin{document}
+\emergencystretch=3em
 
 \tableofcontents
 \newpage
@@ -59,172 +81,301 @@
 \listoftables
 \newpage
 
-\section{Introduction}
-
-Electronic commerce is a representative domain for studying software architecture because the business problem is naturally split across identity, catalog, cart, order, payment, shipment, and customer support capabilities. A small prototype can be implemented as a monolithic Django application, but a system that must support independent evolution, independent scaling, and AI-assisted shopping is better analyzed through the lens of microservices and Domain Driven Design (DDD). This report studies such a system from the perspective of software architecture and design. The implemented project is a Docker-based Django commerce demo with six application services, an Nginx gateway, MySQL and PostgreSQL databases, and an AI chatbot service supported by file-based retrieval artifacts and an optional Neo4j behavior graph.
-
-The purpose of the report is not only to restate the theory of microservices, but to connect architectural concepts to concrete source code. The current implementation keeps \texttt{user\_service} as the owner of customer and staff web user interfaces, Django session authentication, JWT API authentication, gateway metadata, editorial content, and chatbot proxying. \texttt{product\_service} owns the unified catalog API with ten categories and one hundred seeded products. \texttt{order\_service} owns cart, saved items, compare items, orders, checkout orchestration, and analytics. \texttt{payment\_service} and \texttt{shipping\_service} own their respective internal lifecycles. Finally, \texttt{chatbot\_service} owns chat replies, behavior ingestion, product recommendation logic, RAG artifacts, model artifacts, and optional Neo4j graph retrieval.
-
-\subsection{Objectives and Scope}
-
-This essay has four objectives. First, it explains the architectural transition from a monolithic design to a microservice design and shows why DDD is useful for service decomposition. Second, it documents the e-commerce system requirements and maps them to bounded contexts. Third, it presents the implemented system architecture, data ownership model, API gateway, security approach, and deployment design. Fourth, it analyzes the AI product consultation service, including behavior events, model selection, retrieval-augmented generation, Neo4j graph context, and customer-facing integration points.
-
-The scope is Version 1 of the academic essay. The report focuses on design, architecture, implementation evidence, and evaluation. It does not claim production readiness. The current project is an educational commerce system designed for demonstrating microservice boundaries, service-to-service communication, and AI-assisted customer experience.
-
-\subsection{Methodology}
-
-The analysis is based on three sources of evidence: the course reference document for the essay structure, the project repository, and the generated evidence artifacts in the project. Source code files were inspected for models, service clients, views, management commands, Docker configuration, Nginx routing, and AI pipeline behavior. The resulting essay therefore describes the system as it is implemented rather than as an abstract template.
-
 \section{From Monolithic Architecture to Microservices and DDD}
 
-\subsection{Monolithic Architecture}
+\subsection{Introduction to Monolithic Architecture}
 
-A monolithic architecture deploys the user interface, business logic, and data access layer as one application unit. In an e-commerce example, product browsing, user management, cart logic, checkout, payment, delivery status, and recommendation logic could all be located inside a single Django project and backed by a single database. This approach has practical advantages during the early phase of a project: the development environment is simple, deployment is direct, and transactions across modules are easier because all data is local to one runtime.
+\subsubsection{Concept}
 
-However, monolithic architecture becomes more difficult to maintain as the system grows. A change to the payment flow may require redeploying the entire application. A scaling need in catalog reads may force the whole application to scale, even if checkout traffic is low. A bug in one module may affect unrelated features because the runtime boundary is shared. In team-based development, multiple developers may also compete inside the same codebase and database schema. These problems are architectural rather than only technical; they are caused by weak boundaries.
+Monolithic Architecture is an architectural style in which the presentation layer, business logic, and data access layer are packaged and deployed as a single application. In a simple e-commerce system, user management, product catalog, cart, order, payment, shipping, and recommendation logic may all be located in the same Django project and connected to the same database.
+
+\subsubsection{Typical Structure}
+
+A typical monolithic application contains three internal layers:
+
+\begin{itemize}
+    \item \textbf{Presentation layer}: web pages, forms, templates, or frontend screens.
+    \item \textbf{Business logic layer}: product rules, order calculation, payment flow, shipping status, and recommendation logic.
+    \item \textbf{Data access layer}: database models, queries, repositories, and migrations.
+\end{itemize}
+
+The layers may be internally organized, but they are still deployed as one runtime unit.
+
+\subsubsection{Practical E-Commerce Example}
+
+For an e-commerce system, a monolithic Django application may include:
+
+\begin{itemize}
+    \item Product and category management.
+    \item User registration, authentication, and role management.
+    \item Cart and checkout.
+    \item Order history.
+    \item Payment and shipping status.
+    \item Product recommendation and chatbot modules.
+\end{itemize}
+
+This is convenient for a small MVP because development and deployment are simple. However, the architecture becomes difficult to maintain as the domain grows.
+
+\subsubsection{Detailed Drawbacks}
+
+\begin{itemize}
+    \item \textbf{Hard to scale}: the whole application must be scaled even if only catalog browsing is under heavy load.
+    \item \textbf{High coupling}: a change in payment logic can affect unrelated product or order modules.
+    \item \textbf{Risky deployment}: one small bug can break the whole system.
+    \item \textbf{Difficult team development}: many developers modify the same codebase and database schema.
+    \item \textbf{Weak domain boundaries}: technical folders may hide business dependencies.
+\end{itemize}
+
+\subsubsection{When to Use Monolithic Architecture}
+
+Monolithic architecture is still useful when the project is small, the team is small, requirements are not stable, and the main goal is to validate the idea quickly. For a teaching demo, it is useful as a starting point for explaining why microservices and DDD become important.
 
 \subsection{Microservices Architecture}
 
-Microservices architecture decomposes the system into small, independently deployable services. Each service encapsulates a business capability, owns its data, and communicates with other services through explicit APIs. The project analyzed in this essay applies this principle by separating the system into \texttt{user\_service}, \texttt{product\_service}, \texttt{order\_service}, \texttt{payment\_service}, \texttt{shipping\_service}, and \texttt{chatbot\_service}. An Nginx gateway exposes the main public entry point on port 8080 and routes traffic to service hostnames inside the Docker network.
+\subsubsection{Concept}
 
-The key benefit of this design is independent change. Catalog seed data and product APIs can evolve without changing the payment service. Payment and shipping lifecycles can be tested and deployed as internal services without exposing their databases to the UI. The chatbot service can build RAG artifacts, train behavior models, and query Neo4j without pushing AI dependencies into the order service. This supports the microservice principles of high cohesion, loose coupling, and fault isolation.
+Microservices Architecture decomposes a system into small, independently deployable services. Each service owns one business capability and communicates with other services through explicit APIs such as REST or gRPC.
 
-The tradeoff is distributed complexity. A checkout request now crosses service boundaries. If payment creation succeeds but shipment creation fails, the order service must handle compensation. Network calls require timeouts, internal keys, error responses, and stable data contracts. These costs are acceptable only if the service boundaries match real business boundaries.
-
-\subsection{Domain Driven Design}
-
-Domain Driven Design is useful because it encourages the team to model software around business concepts rather than technical layers. In DDD, a bounded context defines a boundary inside which a domain model has a specific meaning. In this project, the concept of a ``product'' means a canonical catalog entry inside \texttt{product\_service}, but it becomes a snapshot inside \texttt{order\_service}. This distinction is important. The order service does not own the product catalog; it stores product name, brand, category, image, unit price, and quantity as historical order data so that old orders remain readable even if the catalog later changes.
-
-DDD also clarifies integration relationships. The UI context consumes the catalog context through an Open Host Service style API. The commerce context acts as a customer of payment and shipping contexts. The AI assistant context consumes catalog data and behavior data to produce recommendations, but it does not own checkout state. These boundaries prevent an AI feature from becoming a hidden dependency inside every service.
-
-\begin{figure}[H]
-    \centering
-    \safeincludegraphics[width=0.95\linewidth]{EssayV1/ddd_context_map.png}
-    \caption{DDD bounded context map for the implemented commerce system.}
-    \label{fig:ddd-context}
-\end{figure}
-
-\section{Requirements and Domain Decomposition}
-
-\subsection{Functional Requirements}
-
-The implemented system supports the following functional requirements:
-
-\begin{enumerate}[label=\arabic*.]
-    \item Customer registration, login, dashboard browsing, cart management, checkout, order listing, and payment confirmation.
-    \item Staff registration, login, dashboard access, product management, customer inspection, order inspection, and shipping status updates.
-    \item A unified product catalog with categories, product search, filtering, brand data, price, stock, and images.
-    \item Cart, saved list, comparison list, checkout, order snapshots, payment snapshots, shipping snapshots, and customer analytics.
-    \item Internal payment record creation, confirmation, cancellation rules, and status tracking.
-    \item Internal shipment record creation, shipping status transitions, and staff-managed delivery status updates.
-    \item AI-assisted shopping through dashboard suggestions, cart buy-together suggestions, and a floating chatbot widget.
-    \item Behavior event persistence and recovery through a backfill command in \texttt{user\_service}.
-\end{enumerate}
-
-\subsection{Non-functional Requirements}
-
-The design also addresses non-functional requirements:
+\subsubsection{Characteristics}
 
 \begin{itemize}
-    \item \textbf{Scalability}: catalog, order, payment, shipping, and AI services can be scaled independently in principle.
-    \item \textbf{Maintainability}: each service owns a limited domain model and a service-local database.
-    \item \textbf{Security}: browser UI uses Django session authentication, API authentication uses JWT, and internal APIs use service keys such as \texttt{X-Internal-Key}.
-    \item \textbf{Availability}: the chatbot can fall back to file-based RAG and rule-based responses when Neo4j or an LLM provider is unavailable.
-    \item \textbf{Deployability}: Docker Compose defines repeatable runtime wiring for databases, services, volumes, and the Nginx gateway.
-    \item \textbf{Compatibility}: customer and staff routes remain stable while service boundaries are introduced behind the UI.
+    \item Each service has its own codebase and deployment unit.
+    \item Each service owns its data and avoids direct access to another service's database.
+    \item Services communicate through APIs.
+    \item Services can be developed, tested, scaled, and deployed independently.
+    \item Failures can be isolated more clearly than in a monolith.
 \end{itemize}
 
-\subsection{Bounded Contexts}
-
-\begin{longtable}{p{0.22\linewidth}p{0.24\linewidth}p{0.43\linewidth}}
-\caption{Domain decomposition into bounded contexts.}
-\label{tab:bounded-contexts}\\
-\toprule
-\textbf{Bounded context} & \textbf{Service} & \textbf{Main responsibility}\\
-\midrule
-\endfirsthead
-\toprule
-\textbf{Bounded context} & \textbf{Service} & \textbf{Main responsibility}\\
-\midrule
-\endhead
-Identity and UI & \texttt{user\_service} & Customer/staff UI, session authentication, JWT API auth, user profile payloads, editorial content, chatbot proxy, gateway inspection page.\\
-Catalog & \texttt{product\_service} & Category and product catalog, seeded catalog data, catalog search and filtering, staff-protected writes.\\
-Commerce & \texttt{order\_service} & Cart, saved items, compare items, checkout orchestration, order and item snapshots, analytics, behavior-source export.\\
-Payment & \texttt{payment\_service} & Payment record lifecycle, confirmation rules, cancellation rules, payment status persistence.\\
-Shipping & \texttt{shipping\_service} & Shipment address and status lifecycle, valid transition rules, delivery status updates.\\
-AI assistant & \texttt{chatbot\_service} & Chat reply API, behavior event storage, model artifacts, RAG knowledge base, optional Neo4j graph retrieval.\\
-\bottomrule
-\end{longtable}
-
-\section{System Architecture}
-
-\subsection{Overall Architecture}
-
-The implemented system follows a database-per-service microservice style. The Nginx gateway is the primary public entry point at \texttt{http://localhost:8080/}. Browser routes such as \texttt{/customer/}, \texttt{/staff/}, \texttt{/admin/}, and \texttt{/gateway/} are routed to \texttt{user\_service}. Public catalog API routes are routed to \texttt{product\_service}. Order, payment, shipping, and chat APIs are also routed by Nginx, while the order, payment, and shipping services remain internal-first from the application perspective.
-
-\begin{figure}[H]
-    \centering
-    \safeincludegraphics[width=0.98\linewidth]{EssayV1/system_architecture.png}
-    \caption{Implemented Docker Compose architecture with Nginx gateway and six application services.}
-    \label{fig:system-architecture}
-\end{figure}
-
-\subsection{Service Matrix}
+\subsubsection{Monolithic vs Microservices}
 
 \begin{table}[H]
 \centering
-\caption{Runtime service matrix.}
-\label{tab:service-matrix}
-\begin{tabular}{p{0.20\linewidth}p{0.40\linewidth}p{0.22\linewidth}p{0.10\linewidth}}
+\caption{Comparison between monolithic and microservices architecture.}
+\label{tab:mono-vs-micro}
+\begin{tabular}{p{0.25\linewidth}p{0.32\linewidth}p{0.32\linewidth}}
 \toprule
-\textbf{Service} & \textbf{Role} & \textbf{Database} & \textbf{Port}\\
+\textbf{Criteria} & \textbf{Monolithic} & \textbf{Microservices}\\
 \midrule
-\texttt{gateway} & Nginx public entry point and reverse proxy & None & 8080\\
-\texttt{user\_service} & UI, session auth, JWT auth, staff/customer flows & MySQL \texttt{user\_db} & 8000, 8003\\
-\texttt{product\_service} & Unified catalog API & PostgreSQL \texttt{product\_db} & 8001\\
-\texttt{order\_service} & Cart, compare, saved, checkout, orders & MySQL \texttt{order\_db} & internal\\
-\texttt{payment\_service} & Payment records and confirmation & PostgreSQL \texttt{payment\_db} & internal\\
-\texttt{shipping\_service} & Shipment records and status transitions & PostgreSQL \texttt{shipping\_db} & internal\\
-\texttt{chatbot\_service} & Chat, RAG, behavior events, graph context & PostgreSQL \texttt{chatbot\_db}, Neo4j, files & 8005\\
+Deployment & One application package & Many independently deployed services\\
+Database & Usually one shared database & Database-per-service principle\\
+Scaling & Scale the whole application & Scale each service independently\\
+Development & Simple early development & Better for multiple teams and large domains\\
+Failure impact & One module can affect the whole runtime & Failure can be isolated by service boundary\\
+Complexity & Lower operational complexity & Higher distributed-system complexity\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{API Gateway Design}
+\subsubsection{Advantages}
 
-The Nginx gateway provides a stable entry point and hides internal service hostnames from browser users. Its routing rules map UI routes and authentication APIs to \texttt{user-service}, product APIs to \texttt{product-service}, cart and order APIs to \texttt{order-service}, payment APIs to \texttt{payment-service}, shipment APIs to \texttt{shipping-service}, and chat APIs to \texttt{chatbot-service}. The gateway does not replace service-level authorization; it routes traffic, while the services still enforce JWT, session, staff key, or internal key checks.
+\begin{itemize}
+    \item Independent scaling and deployment.
+    \item Clearer business ownership.
+    \item Easier technology evolution per service.
+    \item Better fault isolation.
+    \item Better fit for large systems and team-based development.
+\end{itemize}
 
-\begin{lstlisting}[caption={Simplified Nginx gateway routing concept.}]
-location /customer/      { proxy_pass http://user-service:8000; }
-location /staff/         { proxy_pass http://user-service:8000; }
-location /api/products/  { proxy_pass http://product-service:8000; }
-location /api/cart/      { proxy_pass http://order-service:8000; }
-location /api/orders/    { proxy_pass http://order-service:8000; }
-location /api/payments/  { proxy_pass http://payment-service:8000; }
-location /api/shipments/ { proxy_pass http://shipping-service:8000; }
-location /api/chat/      { proxy_pass http://chatbot-service:8000; }
+\subsubsection{Disadvantages}
+
+\begin{itemize}
+    \item Network calls add latency and failure cases.
+    \item Data consistency becomes harder.
+    \item Deployment and monitoring are more complex.
+    \item Debugging distributed workflows requires better logs and tracing.
+    \item Service boundaries must be designed carefully.
+\end{itemize}
+
+\subsubsection{Design Principles}
+
+Good microservice design follows high cohesion, loose coupling, database ownership, API contracts, automation, observability, and fault-tolerant communication. A service should represent a business capability rather than a technical layer.
+
+\subsection{Domain Driven Design (DDD)}
+
+\subsubsection{Goal}
+
+Domain Driven Design helps model software around the business domain. Instead of starting from database tables or technical folders, DDD starts with domain language, business rules, bounded contexts, aggregates, entities, and value objects.
+
+\subsubsection{Core Concepts}
+
+\begin{itemize}
+    \item \textbf{Domain}: the business problem area.
+    \item \textbf{Subdomain}: a smaller business area inside the domain.
+    \item \textbf{Bounded Context}: a boundary where a model has a precise meaning.
+    \item \textbf{Entity}: an object with identity, such as User, Product, or Order.
+    \item \textbf{Value Object}: an object defined by value, such as Money or Address.
+    \item \textbf{Aggregate}: a consistency boundary around related entities.
+    \item \textbf{Context Map}: a diagram showing relationships between bounded contexts.
+\end{itemize}
+
+\subsubsection{Context Map}
+
+In e-commerce, the word ``product'' can have different meanings in different contexts. In the Product Context, it is a live catalog item. In the Order Context, it becomes a snapshot attached to an order. In the AI Context, it can become a searchable recommendation document. These meanings should not be mixed in one model.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{final_diagram_images/ecom_context_map.png}
+\caption{DDD context map for the target e-commerce system.}
+\label{fig:ecom-context-map}
+\end{figure}
+
+\subsubsection{DDD in Microservices}
+
+DDD is useful for microservices because one bounded context is often a good candidate for one microservice. This does not mean every class becomes a service. The goal is to group behavior and data that change together.
+
+\subsection{Case Study: Healthcare (Practice Decomposition)}
+
+\subsubsection{Problem Description}
+
+Healthcare is used here only as a decomposition case study, not as the main project of the essay. The purpose is to practice DDD thinking in a domain that has multiple business capabilities, such as patient identity, appointment, medical record, billing, pharmacy, and notification.
+
+\subsubsection{Step 1: Identify the Domain}
+
+The domain is a healthcare service system. The core business goal is to help users receive healthcare services safely and traceably. The system may contain patient registration, appointment booking, medical record management, pharmacy support, billing, and notification.
+
+\subsubsection{Step 2: Identify Bounded Contexts}
+
+The healthcare domain can be decomposed into these bounded contexts:
+
+\begin{itemize}
+    \item Patient/User Context.
+    \item Appointment Context.
+    \item Medical Record Context.
+    \item Pharmacy Context.
+    \item Billing Context.
+    \item Notification Context.
+\end{itemize}
+
+\subsubsection{Step 3: Decompose into Microservices}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\linewidth]{final_diagram_images/healthcare_case_decomposition.png}
+\caption{Healthcare case study decomposition for DDD practice.}
+\label{fig:healthcare-case}
+\end{figure}
+
+Each context can become a service if it has enough independent business behavior. For example, appointment scheduling and billing should not share one database model because their business rules change for different reasons.
+
+\subsubsection{Step 4: Identify Relationships}
+
+The Appointment Context may call Notification to send reminders. The Medical Record Context may produce billing information. The Pharmacy Context may consume prescription-related information. These interactions should happen through APIs, not through direct database access.
+
+\subsubsection{Example API}
+
+\begin{lstlisting}[caption={Example healthcare API decomposition.}]
+POST /api/patients/
+POST /api/appointments/
+GET  /api/medical-records/{patient_id}/
+POST /api/pharmacy/dispense-requests/
+POST /api/billing/invoices/
 \end{lstlisting}
 
-\section{Service Design}
+\subsection{Conclusion}
 
-\subsection{User Service}
+Monolithic architecture is suitable for simple early systems, but microservices are more appropriate when the system grows and the domain has clear boundaries. DDD provides a systematic way to identify those boundaries before creating services.
 
-\texttt{user\_service} is the integration-facing service for customer and staff browser workflows. It uses Django's authentication system and keeps browser authentication separate from API authentication. Customer and staff UI sessions use separate cookie names, which allows both roles to be demonstrated in the same browser. API authentication is exposed through endpoints such as \texttt{/api/auth/register/}, \texttt{/api/auth/token/}, \texttt{/api/auth/token/refresh/}, and \texttt{/api/auth/me/}.
+\section{Developing the Current E-Commerce Microservices System}
 
-The service also acts as a facade over the internal commerce services. For example, when a customer opens the cart page, \texttt{user\_service} calls \texttt{order\_service}. When the dashboard needs products, it calls \texttt{product\_service}. When the customer uses the chatbot widget, it proxies the request to \texttt{chatbot\_service}. This design preserves stable browser routes while allowing backend service decomposition.
+\subsection{Project Identification}
 
-Important data models in this context include \texttt{BlogPost}, \texttt{Testimonial}, and \texttt{LegacyUserMapping}. The use of \texttt{LegacyUserMapping} indicates that the architecture was designed with migration in mind, not only with a greenfield prototype assumption.
+The real project used in this essay is the Docker-based Django commerce project in
+\codepath{c:/Users/nguye/Desktop/kiemtra01}. The source evidence comes from
+\codepath{README.md}, \codepath{docker-compose.yml}, \codepath{docker/gateway/nginx.conf},
+and the service folders under \codepath{services/}. Unlike a purely theoretical design,
+this project is already decomposed into six application services, one Nginx gateway,
+shared infrastructure containers, and optional Neo4j graph storage for the AI service.
 
-\subsection{Product Service}
+\begin{longtable}{p{0.22\linewidth}p{0.18\linewidth}p{0.18\linewidth}p{0.32\linewidth}}
+\caption{Real service matrix from Docker Compose.}
+\label{tab:real-service-matrix}\\
+\toprule
+\textbf{Service} & \textbf{Host/port} & \textbf{Database} & \textbf{Role}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Service} & \textbf{Host/port} & \textbf{Database} & \textbf{Role}\\
+\midrule
+\endhead
+\codepath{gateway} & \codepath{localhost:8080} & none & Public Nginx entrypoint.\\
+\codepath{user\_service} & \codepath{8000}, \codepath{8003} debug & MySQL \codepath{user\_db} & Customer/staff UI, session auth, JWT auth, gateway metadata, chatbot proxy.\\
+\codepath{product\_service} & \codepath{8001} debug & PostgreSQL \codepath{product\_db} & Catalog API, categories, products, seed data.\\
+\codepath{order\_service} & internal only & MySQL \codepath{order\_db} & Cart, saved items, compare list, checkout, orders, shipping snapshot, analytics.\\
+\codepath{payment\_service} & internal only & PostgreSQL \codepath{payment\_db} & Payment records and confirmation lifecycle.\\
+\codepath{shipping\_service} & internal only & PostgreSQL \codepath{shipping\_db} & Shipment records and status lifecycle.\\
+\codepath{chatbot\_service} & \codepath{8005} debug & PostgreSQL \codepath{chatbot\_db} & Chatbot, RAG, behavior model, Neo4j graph context.\\
+\codepath{neo4j} & \codepath{7474}, \codepath{7687} & graph store & Optional behavior graph for chatbot context.\\
+\bottomrule
+\end{longtable}
 
-\texttt{product\_service} owns the catalog. Its model is intentionally unified rather than split into separate laptop, mobile, and accessory services. The \texttt{Category} model defines category name, slug, description, hero image URL, sort order, and active state. The \texttt{Product} model belongs to a category and stores name, brand, description, image URL, price, stock, and timestamps. The seed data defines ten categories and one hundred products, including business laptops, gaming laptops, ultrabooks, smartphones, tablets, smartwatches, audio, keyboards and mice, chargers and cables, and bags and stands.
+\subsection{Requirement Identification}
 
-\begin{lstlisting}[language=Python,caption={Core catalog model structure.}]
+\subsubsection{Functional Requirements}
+
+The implemented system supports:
+
+\begin{itemize}
+    \item Customer registration, login, dashboard browsing, product detail, saved list, compare list, cart, checkout, orders, and chatbot UI.
+    \item Staff login, dashboard, product management, customer inspection, order inspection, and shipping status updates.
+    \item Catalog browsing across 10 categories and 100 seeded demo products from \codepath{services/product\_service/catalog/seed\_data.py}.
+    \item Checkout orchestration in \codepath{order\_service}, with payment records delegated to \codepath{payment\_service} and shipment records delegated to \codepath{shipping\_service}.
+    \item AI-assisted recommendations on dashboard/cart and chatbot replies through \codepath{chatbot\_service}.
+\end{itemize}
+
+\subsubsection{Non-functional Requirements}
+
+\begin{itemize}
+    \item \textbf{Deployability}: Docker Compose starts the gateway, services, MySQL, PostgreSQL, and Neo4j.
+    \item \textbf{Boundary ownership}: every service owns its models and database; cross-service references are IDs or snapshots.
+    \item \textbf{Stable public entrypoint}: Nginx stays on \codepath{8080}; direct service ports are only debug surfaces.
+    \item \textbf{Security}: browser UI uses Django sessions; API auth uses JWT; internal service calls use \codepath{X-Internal-Key}.
+    \item \textbf{Resilience}: chatbot still returns a rule-based/catalog response if the configured LLM or Neo4j graph is unavailable.
+\end{itemize}
+
+\subsection{DDD-Based System Decomposition}
+
+\subsubsection{Bounded Contexts}
+
+\begin{longtable}{p{0.24\linewidth}p{0.24\linewidth}p{0.42\linewidth}}
+\caption{Real bounded contexts and service ownership.}
+\label{tab:real-bounded-contexts}\\
+\toprule
+\textbf{Bounded context} & \textbf{Physical service} & \textbf{Evidence}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Bounded context} & \textbf{Physical service} & \textbf{Evidence}\\
+\midrule
+\endhead
+User and Web Edge & \codepath{user\_service} & \codepath{customer/urls.py}, \codepath{staff/urls.py}, \codepath{customer/api\_auth.py}\\
+Catalog & \codepath{product\_service} & \codepath{catalog/models.py}, \codepath{catalog/urls.py}, \codepath{catalog/seed\_data.py}\\
+Cart, Saved, Compare, Order & \codepath{order\_service} & \codepath{orders/models.py}; cart is a module inside order service, not a separate container.\\
+Payment & \codepath{payment\_service} & \codepath{payments/models.py}, \codepath{payments/urls.py}\\
+Shipping & \codepath{shipping\_service} & \codepath{shipments/models.py}, \codepath{shipments/urls.py}\\
+AI Consultation & \codepath{chatbot\_service} & \codepath{chatbot/services.py}, \codepath{chatbot/behavior\_ai.py}, \codepath{chatbot/rag\_kb.py}\\
+\bottomrule
+\end{longtable}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{final_diagram_images/ecom_context_map.png}
+\caption{DDD context map for the current e-commerce system.}
+\label{fig:ecom-context-map-real}
+\end{figure}
+
+The important design point is that \codepath{cart} is a bounded capability but not a separate physical service in this repository. It is implemented inside \codepath{order\_service} through \codepath{CartItem}, \codepath{SavedItem}, and \codepath{CompareItem}. This is a practical service-boundary choice: all mutable commerce state changes together and is protected by the same internal key.
+
+\subsection{Product Service Design}
+
+\subsubsection{Model Evidence}
+
+The catalog model is implemented in \codepath{services/product\_service/catalog/models.py}. A category owns many products, and deleting a category is protected by \codepath{on\_delete=models.PROTECT}.
+
+\begin{lstlisting}[language=Python,caption={Real product service model excerpt.}]
 class Category(models.Model):
     name = models.CharField(max_length=120, unique=True)
     slug = models.SlugField(max_length=120, unique=True)
     description = models.TextField(blank=True)
-    hero_image_url = models.URLField(blank=True)
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -233,335 +384,685 @@ class Product(models.Model):
                                  related_name="products")
     name = models.CharField(max_length=255)
     brand = models.CharField(max_length=120, default="Generic")
-    description = models.TextField(blank=True)
-    image_url = models.URLField(blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
     stock = models.PositiveIntegerField(default=0)
 \end{lstlisting}
 
-This model supports catalog API endpoints such as \texttt{GET /api/categories/}, \texttt{GET /api/products/}, and \texttt{GET /api/products/<id>/}. Staff write operations are protected with \texttt{X-Staff-Key}, which keeps catalog mutation separate from public browsing.
+\subsubsection{API Evidence}
 
-\subsection{Order Service}
+\codepath{catalog/urls.py} registers DRF routes for \codepath{categories} and \codepath{products}. The Nginx gateway exposes these as \codepath{/api/categories/} and \codepath{/api/products/}.
 
-\texttt{order\_service} owns commerce state: cart items, saved items, compare items, orders, order items, and shipping snapshots. It also orchestrates checkout. The design uses a \texttt{ProductSnapshotMixin} for cart, saved, compare, and order item records. This is an important architectural choice because order history should remain stable even when catalog product data changes.
+\begin{lstlisting}[caption={Product service API routes.}]
+GET    /api/categories/
+GET    /api/products/
+GET    /api/products/{id}/
+POST   /api/products/          # staff key required
+PUT    /api/products/{id}/     # staff key required
+DELETE /api/products/{id}/     # staff key required
+\end{lstlisting}
 
-The checkout flow uses a database transaction to create an order, create shipping details, bulk-create order items, clear the cart, request payment creation from \texttt{payment\_service}, and request shipment creation from \texttt{shipping\_service}. If shipment creation fails after payment creation, the code attempts to cancel the created payment. This is a simple compensation pattern suitable for an educational synchronous workflow.
+\subsection{User Service Design}
 
-\subsection{Payment Service}
+\subsubsection{Authentication Model}
 
-\texttt{payment\_service} owns payment persistence and payment state transitions. Its model stores \texttt{order\_id}, \texttt{user\_id}, \texttt{amount}, \texttt{status}, and \texttt{paid\_at}. The status values are \texttt{pending}, \texttt{paid}, \texttt{failed}, and \texttt{cancelled}. A payment can be confirmed or cancelled only while it is pending. This keeps payment invariants close to the payment data model instead of scattering them throughout the UI.
+The project uses Django's built-in \codepath{auth\_user} table instead of a custom role model. Role is derived from \codepath{is\_staff} and \codepath{is\_superuser} in \codepath{customer/auth\_rules.py}. The same service also owns customer/staff templates, editorial content, JWT API auth, and the customer-facing chatbot proxy.
 
-\subsection{Shipping Service}
+\begin{lstlisting}[caption={JWT auth API in user\_service.}]
+POST /api/auth/register/
+POST /api/auth/token/
+POST /api/auth/token/refresh/
+GET  /api/auth/me/
+\end{lstlisting}
 
-\texttt{shipping\_service} owns shipment address data and shipping status. Its transition map allows movement from \texttt{pending} to \texttt{preparing}, \texttt{shipped}, \texttt{delivered}, or \texttt{cancelled}; from \texttt{preparing} to \texttt{shipped}, \texttt{delivered}, or \texttt{cancelled}; from \texttt{shipped} to \texttt{delivered}; and prevents invalid movement from terminal states. The order service mirrors a snapshot of the current shipping status for existing UI compatibility, but the shipment service owns the lifecycle record.
+Browser routes such as \codepath{/customer/login/}, \codepath{/customer/dashboard/}, \codepath{/customer/cart/}, and \codepath{/staff/orders/} remain stable. Customer and staff sessions use separate cookie names, so both roles can be demonstrated in one browser.
 
-\subsection{Chatbot Service}
+\subsection{Cart and Order Service Design}
 
-\texttt{chatbot\_service} is the AI assistant context. It exposes a chat reply endpoint, records behavior events, predicts user category affinity, retrieves product and FAQ context, optionally queries Neo4j, and then calls a configured LLM provider. If the provider is unavailable, the service returns a catalog-based fallback response. This design is important because the customer experience remains usable even when external AI dependencies fail.
+\subsubsection{Cart Model}
 
-\section{Data and Persistence Design}
+Cart state is stored in \codepath{order\_service}. There is no separate \codepath{cart\_service} container and no physical \codepath{cart} table. Instead, \codepath{CartItem} is user-scoped by \codepath{user\_id} and keeps a product snapshot so the order database never directly joins the product database.
 
-\subsection{Database-per-Service}
+\begin{lstlisting}[language=Python,caption={Real cart and snapshot model excerpt.}]
+class ProductSnapshotMixin(models.Model):
+    category_slug = models.SlugField(max_length=120, blank=True)
+    category_name = models.CharField(max_length=120, blank=True)
+    product_id = models.PositiveIntegerField(default=0)
+    product_name = models.CharField(max_length=255)
+    product_brand = models.CharField(max_length=120, blank=True)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
 
-The system follows the database-per-service principle. User and order data are stored in MySQL, while product, payment, shipping, and chatbot behavior data are stored in PostgreSQL. Neo4j is used as an optional graph database for behavior-context queries. File artifacts under \texttt{services/chatbot\_service/chatbot/artifacts} store the RAG knowledge base, training data, model artifacts, metrics, and runtime configuration.
+class CartItem(ProductSnapshotMixin):
+    user_id = models.PositiveIntegerField(db_index=True)
+    quantity = models.PositiveIntegerField(default=1)
+\end{lstlisting}
+
+\subsubsection{Order Model and Workflow}
+
+\begin{lstlisting}[language=Python,caption={Real order model excerpt.}]
+class Order(models.Model):
+    user_id = models.PositiveIntegerField(db_index=True)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_status = models.CharField(max_length=20, default="pending")
+    shipping_status = models.CharField(max_length=20, default="pending")
+    source = models.CharField(max_length=20, default="live")
+
+class OrderItem(ProductSnapshotMixin):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE,
+                              related_name="items")
+    quantity = models.PositiveIntegerField(default=1)
+\end{lstlisting}
+
+\codepath{orders/urls.py} exposes \codepath{/api/cart/}, \codepath{/api/checkout/}, \codepath{/api/orders/}, \codepath{/api/orders/\{id\}/pay/}, \codepath{/api/staff/orders/}, and internal behavior-source APIs. All order endpoints require an internal key when called from other services.
+
+\subsection{Payment and Shipping Services}
+
+\subsubsection{Payment Service}
+
+\begin{lstlisting}[language=Python,caption={Real payment model excerpt.}]
+class Payment(models.Model):
+    order_id = models.PositiveIntegerField(unique=True)
+    user_id = models.PositiveIntegerField(db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=20, default="pending")
+    paid_at = models.DateTimeField(null=True, blank=True)
+\end{lstlisting}
+
+Payment status can be \codepath{pending}, \codepath{paid}, \codepath{failed}, or \codepath{cancelled}. The API includes \codepath{/api/payments/}, \codepath{/api/payments/by-order/\{order\_id\}/}, \codepath{/api/payments/\{id\}/confirm/}, and \codepath{/api/payments/\{id\}/cancel/}.
+
+\subsubsection{Shipping Service}
+
+\begin{lstlisting}[language=Python,caption={Real shipment model excerpt.}]
+class Shipment(models.Model):
+    order_id = models.PositiveIntegerField(unique=True)
+    user_id = models.PositiveIntegerField(db_index=True)
+    recipient_name = models.CharField(max_length=120)
+    address_line = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, default="pending")
+\end{lstlisting}
+
+Shipping status can move through \codepath{pending}, \codepath{preparing}, \codepath{shipped}, \codepath{delivered}, and \codepath{cancelled}. Invalid transitions are rejected in \codepath{Shipment.can\_update\_status()}.
+
+\subsection{Class Diagram and Data Model}
 
 \begin{figure}[H]
-    \centering
-    \safeincludegraphics[width=0.98\linewidth]{EssayV1/database_mapping.png}
-    \caption{Database-per-service mapping in the implemented system.}
-    \label{fig:database-mapping}
+\centering
+\includegraphics[width=0.98\linewidth]{final_diagram_images/ecom_class_diagram.png}
+\caption{Class diagram from real Django models.}
+\label{fig:ecom-class-diagram}
 \end{figure}
 
-\subsection{Data Ownership and Duplication}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{final_diagram_images/ecom_database_mapping.png}
+\caption{Database-per-service mapping from Docker Compose and Django settings.}
+\label{fig:ecom-db-mapping}
+\end{figure}
 
-Microservices often require controlled duplication. The catalog service owns products, but the order service stores product snapshots when items enter the cart and when orders are created. This prevents historical orders from changing unexpectedly if a product name, brand, image, or price changes later. Similarly, the order service stores payment and shipping status snapshots for UI compatibility, while the detailed payment and shipment records live in their own services.
+The following diagrams are exported from Visual Paradigm and included as the final design evidence. They provide a more detailed view than the summarized report diagrams above: the class diagram shows the main domain objects and service ownership, while the ORM and ERD diagrams show how those objects are persisted across the service databases.
 
-The AI service also uses duplicated product context through generated knowledge-base artifacts. This is acceptable because RAG retrieval needs a local search structure and because the artifact can be rebuilt from the catalog API. The artifact is not the source of truth; \texttt{product\_service} remains the source of truth for the catalog.
+\begin{figure}[H]
+\centering
+\diagramimage[width=0.98\linewidth]{final_diagram_images/Class_Diagram_E_Commerce}
+\caption{Visual Paradigm class diagram for the e-commerce microservices system.}
+\label{fig:vp-class-diagram}
+\end{figure}
 
-\subsection{Database Mapping Summary}
+\begin{figure}[H]
+\centering
+\diagramimage[width=0.98\linewidth]{final_diagram_images/DataModel_ORM}
+\caption{Visual Paradigm ORM data model for the e-commerce system.}
+\label{fig:vp-orm-diagram}
+\end{figure}
 
-\begin{longtable}{p{0.22\linewidth}p{0.24\linewidth}p{0.43\linewidth}}
-\caption{Main database mapping by service.}
-\label{tab:database-mapping}\\
+\begin{figure}[H]
+\centering
+\diagramimage[width=0.98\linewidth]{final_diagram_images/DataModel_ORM_ERD}
+\caption{Visual Paradigm ERD view of the ORM data model.}
+\label{fig:vp-erd-diagram}
+\end{figure}
+
+\subsection{Database Design}
+
+\subsubsection{Database Engines}
+
+The database engines are defined in each service's \codepath{config/settings.py}. \codepath{user\_service} and \codepath{order\_service} use MySQL. \codepath{product\_service}, \codepath{payment\_service}, \codepath{shipping\_service}, and \codepath{chatbot\_service} use PostgreSQL. The initialization scripts are \codepath{docker/mysql-init/01-create-databases.sql} and \codepath{docker/postgres-init/01-create-databases.sql}.
+
+\begin{longtable}{p{0.25\linewidth}p{0.23\linewidth}p{0.42\linewidth}}
+\caption{Main database tables in the real project.}
+\label{tab:real-db-tables}\\
 \toprule
-\textbf{Service} & \textbf{Database} & \textbf{Main tables or artifacts}\\
+\textbf{Database} & \textbf{Engine} & \textbf{Main tables}\\
 \midrule
 \endfirsthead
 \toprule
-\textbf{Service} & \textbf{Database} & \textbf{Main tables or artifacts}\\
+\textbf{Database} & \textbf{Engine} & \textbf{Main tables}\\
 \midrule
 \endhead
-\texttt{user\_service} & MySQL \texttt{user\_db} & Django auth user, customer blog posts, testimonials, legacy user mappings.\\
-\texttt{product\_service} & PostgreSQL \texttt{product\_db} & Category and Product.\\
-\texttt{order\_service} & MySQL \texttt{order\_db} & CartItem, SavedItem, CompareItem, Order, OrderItem, OrderShipping.\\
-\texttt{payment\_service} & PostgreSQL \texttt{payment\_db} & Payment record with pending, paid, failed, and cancelled states.\\
-\texttt{shipping\_service} & PostgreSQL \texttt{shipping\_db} & Shipment record with pending, preparing, shipped, delivered, and cancelled states.\\
-\texttt{chatbot\_service} & PostgreSQL \texttt{chatbot\_db} & BehaviorEvent records.\\
-\texttt{chatbot\_service} & Neo4j and files & User, Behavior, Category, Product graph; knowledge base JSON; model artifacts; metrics; screenshots.\\
+\codepath{user\_db} & MySQL & \codepath{auth\_user}, \codepath{customer\_blogpost}, \codepath{customer\_testimonial}, \codepath{customer\_legacyusermapping}\\
+\codepath{product\_db} & PostgreSQL & \codepath{catalog\_category}, \codepath{catalog\_product}\\
+\codepath{order\_db} & MySQL & \codepath{orders\_cartitem}, \codepath{orders\_saveditem}, \codepath{orders\_compareitem}, \codepath{orders\_order}, \codepath{orders\_orderitem}, \codepath{orders\_ordershipping}\\
+\codepath{payment\_db} & PostgreSQL & \codepath{payments\_payment}\\
+\codepath{shipping\_db} & PostgreSQL & \codepath{shipments\_shipment}\\
+\codepath{chatbot\_db} & PostgreSQL & \codepath{chatbot\_behaviorevent}\\
 \bottomrule
 \end{longtable}
 
+\subsubsection{SQL Schema Summary}
+
+The following SQL summarizes the report-level schema. Names are normalized for readability; the real Django tables use app prefixes such as \codepath{catalog\_product} and \codepath{orders\_cartitem}. The logical \codepath{cart} table is included to explain the cart aggregate, while the current implementation stores the active cart directly as user-scoped \codepath{orders\_cartitem} rows.
+
+\begin{lstlisting}[language=SQL,caption={Database schema summary for the e-commerce system.}]
+CREATE TABLE category (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(120) NOT NULL UNIQUE,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE product (
+    id BIGSERIAL PRIMARY KEY,
+    category_id BIGINT NOT NULL REFERENCES category(id),
+    name VARCHAR(255) NOT NULL,
+    brand VARCHAR(120) NOT NULL DEFAULT 'Generic',
+    description TEXT NOT NULL DEFAULT '',
+    image_url VARCHAR(200) NOT NULL DEFAULT '',
+    price DECIMAL(12,2) NOT NULL,
+    stock INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    UNIQUE (category_id, name, brand)
+);
+
+CREATE TABLE user_account (
+    id BIGINT PRIMARY KEY,
+    username VARCHAR(150) NOT NULL UNIQUE,
+    email VARCHAR(254) NOT NULL,
+    password VARCHAR(128) NOT NULL,
+    is_staff BOOLEAN NOT NULL DEFAULT FALSE,
+    is_superuser BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE cart (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE cart_item (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    category_slug VARCHAR(120) NOT NULL,
+    category_name VARCHAR(120) NOT NULL,
+    product_id BIGINT NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    product_brand VARCHAR(120) NOT NULL,
+    unit_price DECIMAL(12,2) NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (user_id, category_slug, product_id)
+);
+
+CREATE TABLE orders (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    total_amount DECIMAL(12,2) NOT NULL,
+    payment_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    shipping_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    source VARCHAR(20) NOT NULL DEFAULT 'live',
+    source_order_id BIGINT NULL,
+    paid_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE order_item (
+    id BIGINT PRIMARY KEY,
+    order_id BIGINT NOT NULL REFERENCES orders(id),
+    category_slug VARCHAR(120) NOT NULL,
+    product_id BIGINT NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    product_brand VARCHAR(120) NOT NULL,
+    unit_price DECIMAL(12,2) NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE payment (
+    id BIGINT PRIMARY KEY,
+    order_id BIGINT NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    paid_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE shipment (
+    id BIGINT PRIMARY KEY,
+    order_id BIGINT NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    recipient_name VARCHAR(120) NOT NULL,
+    phone VARCHAR(40) NOT NULL,
+    address_line VARCHAR(255) NOT NULL,
+    city_or_region VARCHAR(120) NOT NULL,
+    postal_code VARCHAR(40) NOT NULL,
+    country VARCHAR(120) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+\end{lstlisting}
+
+\subsection{Conclusion}
+
+The current project follows microservice decomposition in a pragmatic way. It has six application services rather than a separate service for every subdomain. The cart capability is grouped with order state, while payment, shipping, catalog, user/auth/UI, and AI remain independently deployable services with their own databases.
+
 \section{AI Service for Product Consultation}
 
-\subsection{Purpose of the AI Service}
+\subsection{Goal}
 
-The AI service improves the e-commerce experience by transforming passive browsing into assisted shopping. It supports three customer-facing features: dashboard suggestions based on the current search or filter context, cart suggestions for complementary products, and a floating chat widget for natural-language product consultation. These features are integrated without changing the stable customer routes; the UI calls the user service, and the user service proxies requests to the chatbot service.
+The AI capability is implemented by \codepath{chatbot\_service}. It supports product consultation, recommendation ranking, RAG citations, behavior persistence, optional Neo4j graph context, and fallback responses when LLM access is unavailable.
+
+\subsection{AI Service Architecture}
 
 \begin{figure}[H]
-    \centering
-    \begin{subfigure}{0.48\linewidth}
-        \centering
-        \safeincludegraphics[width=\linewidth]{EssayV1/dashboard_ai.png}
-        \caption{Dashboard AI suggestions.}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.48\linewidth}
-        \centering
-        \safeincludegraphics[width=\linewidth]{EssayV1/cart_ai.png}
-        \caption{Cart buy-together suggestions.}
-    \end{subfigure}
-    \caption{AI recommendations integrated into customer shopping pages.}
-    \label{fig:ai-ui-blocks}
+\centering
+\includegraphics[width=0.92\linewidth]{final_diagram_images/ecom_ai_pipeline.png}
+\caption{Real chatbot and AI recommendation pipeline.}
+\label{fig:ecom-ai-pipeline}
 \end{figure}
 
 \subsection{Behavior Data}
 
-The chatbot service persists behavior events in the \texttt{BehaviorEvent} model. Each event stores a \texttt{user\_ref}, event type, category slug, product id, JSON metadata, and creation time. The metadata captures the message, current category, cart count, saved count, recent paid item count, device type, and price bucket. These fields allow the AI service to combine explicit search intent with historical customer context.
+\codepath{chatbot/models.py} defines \codepath{BehaviorEvent}. It records \codepath{user\_ref}, event type, category slug, product id, JSON metadata, and timestamp. The main recovery path is \codepath{user\_service}'s \codepath{backfill\_chatbot\_behavior} command, which can rebuild behavior input from order history.
 
-The system also contains a recovery path through \texttt{user\_service}'s \texttt{backfill\_chatbot\_behavior} command. This command can export behavior source data from order history and send it back into the chatbot service. This is a practical design choice because behavior pipelines often fail or are introduced after transactional data already exists.
+\begin{lstlisting}[language=Python,caption={Real chatbot behavior model.}]
+class BehaviorEvent(models.Model):
+    user_ref = models.CharField(max_length=120, db_index=True)
+    event_type = models.CharField(max_length=40)
+    category_slug = models.CharField(max_length=120, blank=True)
+    product_id = models.PositiveIntegerField(default=0)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+\end{lstlisting}
 
-\subsection{Model Selection}
+\subsection{Sequence Models: RNN, LSTM, and BiLSTM}
 
-The artifacts include a model comparison across RNN, LSTM, and BiLSTM. All three models reach the same reported accuracy and macro F1 within a very small tolerance, but the selected \texttt{model\_best} is RNN because it has the smallest parameter count and simpler inference. This selection rule is reasonable for a demo system because inference simplicity matters when the accuracy gap is negligible.
+The artifact directory \codepath{services/chatbot\_service/chatbot/artifacts} contains trained model artifacts: \codepath{model\_rnn.keras}, \codepath{model\_lstm.keras}, \codepath{model\_bilstm.keras}, and \codepath{model\_best.keras}. The file \codepath{metrics\_comparison.csv} records the comparison.
 
 \begin{table}[H]
 \centering
-\caption{Behavior model comparison from project artifacts.}
-\label{tab:model-comparison}
-\begin{tabular}{lrrrrrr}
+\caption{AI model metrics from metrics\_comparison.csv.}
+\label{tab:ai-model-metrics}
+\begin{tabular}{lrrrrr}
 \toprule
-\textbf{Model} & \textbf{Accuracy} & \textbf{Macro F1} & \textbf{Params} & \textbf{Best epoch} & \textbf{Val. acc.} & \textbf{Selected}\\
+\textbf{Model} & \textbf{Accuracy} & \textbf{Macro F1} & \textbf{Params} & \textbf{Best epoch} & \textbf{Best val acc.}\\
 \midrule
-RNN & 0.999201 & 0.999410 & 11192 & 7 & 0.996697 & Yes\\
-LSTM & 0.999201 & 0.999410 & 29432 & 4 & 0.996697 & No\\
-BiLSTM & 0.999201 & 0.999410 & 57848 & 2 & 0.997523 & No\\
+RNN & 0.999201 & 0.999410 & 11192 & 7 & 0.996697\\
+LSTM & 0.999201 & 0.999410 & 29432 & 4 & 0.996697\\
+BiLSTM & 0.999201 & 0.999410 & 57848 & 2 & 0.997523\\
 \bottomrule
 \end{tabular}
 \end{table}
 
+The runtime loads \codepath{model\_best.keras}, \codepath{label\_encoder.json}, and \codepath{tokenizer\_or\_vocab.json}. In the current artifacts, RNN is marked as the selected best model, while LSTM and BiLSTM are still present as trained evidence.
+
+\subsection{Knowledge Graph with Neo4j}
+
+Neo4j is optional and configured through \codepath{NEO4J\_URI}, \codepath{NEO4J\_USERNAME}, \codepath{NEO4J\_PASSWORD}, and \codepath{NEO4J\_DATABASE}. The importer in \codepath{chatbot/behavior\_graph.py} creates User, Behavior, Category, and Product nodes, plus relationships such as \codepath{PERFORMED}, \codepath{IN\_CATEGORY}, \codepath{ON\_PRODUCT}, \codepath{BELONGS\_TO}, and \codepath{PREFERS}.
+
+\begin{lstlisting}[caption={Neo4j graph import relationship excerpt.}]
+MERGE (u)-[:PERFORMED]->(b)
+MERGE (b)-[:IN_CATEGORY]->(c)
+MERGE (b)-[:ON_PRODUCT]->(p)
+MERGE (p)-[:BELONGS_TO]->(c)
+MERGE (u)-[pref:PREFERS]->(c)
+\end{lstlisting}
+
+If Neo4j is unavailable, \codepath{BehaviorGraphRetriever} returns an unavailable context and the chatbot continues with RAG and catalog ranking.
+
+\subsection{RAG and Recommendation Flow}
+
+\codepath{chatbot/rag\_kb.py} builds \codepath{knowledge\_base.json} from FAQ content and product documents fetched from \codepath{product\_service}. Retrieval uses token overlap, category preference, stock status, current product context, and behavior preference signals. The service also calls the live catalog API to build recommendation cards.
+
+\begin{lstlisting}[caption={Chatbot API response contract.}]
+POST /api/chat/reply/
+
+Response fields:
+answer
+recommendations
+citations
+source
+fallback_used
+error_code
+\end{lstlisting}
+
+\subsection{Deployment Evidence}
+
+The chatbot service is a Django service on internal port \codepath{8000} and host debug port \codepath{8005}. Docker Compose bind-mounts \codepath{./services/chatbot\_service/chatbot/artifacts} into the container, so generated knowledge bases, model files, metrics, and graph images are preserved outside the container.
+
+\subsection{AI Evidence Checklist}
+
+\begin{itemize}
+    \item LSTM artifacts exist: \codepath{model\_lstm.keras}, \codepath{history\_lstm.png}, \codepath{confusion\_matrix\_lstm.png}.
+    \item Neo4j graph code exists in \codepath{behavior\_graph.py} and demo evidence exists in \codepath{behavior\_graph\_demo.svg}.
+    \item RAG file knowledge base exists in \codepath{knowledge\_base.json}.
+    \item Chatbot API exists at \codepath{/api/chat/reply/}.
+    \item Recommendation output is returned inside the chatbot response as \codepath{recommendations}.
+    \item Screenshots are stored under \codepath{docs/evidence/screenshots/}.
+\end{itemize}
+
+\subsection{Conclusion}
+
+The AI service is not a separate notebook-only experiment. It is wired into the running commerce system through \codepath{chatbot\_service}, called by \codepath{user\_service}, and backed by PostgreSQL behavior events, file-based RAG/model artifacts, optional Neo4j graph context, and live product-service data.
+
+\section{Building the Complete System}
+
+\subsection{Overall Architecture}
+
+The complete system is deployed through Docker Compose. The public entrypoint is the Nginx gateway on \codepath{http://localhost:8080/}. The browser primarily uses gateway routes and customer/staff pages from \codepath{user\_service}; direct ports \codepath{8000}, \codepath{8001}, \codepath{8003}, and \codepath{8005} are debug surfaces.
+
 \begin{figure}[H]
-    \centering
-    \begin{subfigure}{0.48\linewidth}
-        \centering
-        \safeincludegraphics[width=\linewidth]{EssayV1/confusion_matrix_rnn.png}
-        \caption{Confusion matrix for the selected RNN model.}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.48\linewidth}
-        \centering
-        \safeincludegraphics[width=\linewidth]{EssayV1/history_rnn.png}
-        \caption{Training history for the selected RNN model.}
-    \end{subfigure}
-    \caption{Model evidence used for selecting \texttt{model\_best}.}
-    \label{fig:model-evidence}
+\centering
+\includegraphics[width=0.98\linewidth]{final_diagram_images/ecom_system_architecture.png}
+\caption{Runtime architecture of the real Docker Compose system.}
+\label{fig:ecom-system-architecture}
 \end{figure}
 
-\subsection{RAG Knowledge Base}
-
-The RAG layer builds a knowledge base from product data and FAQ content. The \texttt{build\_chat\_kb} command calls the product service, converts products into searchable documents, adds FAQ documents, tokenizes text, and writes \texttt{knowledge\_base.json}. At runtime, \texttt{retrieve\_rag\_context} scores documents by token overlap, preferred category, stock availability, and relation to the current product. The selected documents become citations and prompt context for the LLM.
-
-This design is intentionally lightweight. It does not require a separate vector database for Version 1, but the architecture leaves room for replacing token scoring with embeddings later. The important architectural point is that retrieval is isolated inside the chatbot service and does not leak AI-specific indexes into the catalog service.
-
-\subsection{Neo4j Behavior Graph}
-
-Neo4j is used as an optional graph knowledge base. The graph contains users, behaviors, categories, and products. Relationships such as \texttt{PERFORMED}, \texttt{IN\_CATEGORY}, \texttt{ON\_PRODUCT}, \texttt{BELONGS\_TO}, and \texttt{PREFERS} allow the chatbot to fetch behavior context for a user or product category. If Neo4j is unavailable, the chatbot service reports the graph as unavailable and continues with file-based RAG and catalog-based recommendations.
+\subsection{API Gateway Routing}
 
 \begin{figure}[H]
-    \centering
-    \begin{subfigure}{0.48\linewidth}
-        \centering
-        \safeincludegraphics[width=\linewidth]{EssayV1/neo4j_browser.png}
-        \caption{Neo4j graph evidence.}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.48\linewidth}
-        \centering
-        \safeincludegraphics[width=\linewidth]{EssayV1/neo4j_browser_detail.png}
-        \caption{Neo4j query/detail evidence.}
-    \end{subfigure}
-    \caption{Behavior graph evidence for AI retrieval.}
-    \label{fig:neo4j-evidence}
+\centering
+\includegraphics[width=0.98\linewidth]{final_diagram_images/ecom_gateway_routing.png}
+\caption{Nginx API Gateway route mapping.}
+\label{fig:ecom-gateway-routing}
 \end{figure}
 
-\subsection{Hybrid Recommendation Pipeline}
+The gateway configuration is stored in \codepath{docker/gateway/nginx.conf}. The real routing uses Docker hostnames, not localhost ports, inside the Compose network.
 
-The runtime chatbot pipeline can be summarized as follows:
+\begin{lstlisting}[caption={Real Nginx gateway routing excerpt.}]
+location / {
+    set $target http://user-service:8000;
+    proxy_pass $target;
+}
+
+location /customer/ {
+    set $target http://user-service:8000;
+    proxy_pass $target;
+}
+
+location /staff/ {
+    set $target http://user-service:8000;
+    proxy_pass $target;
+}
+
+location /api/auth/ {
+    set $target http://user-service:8000;
+    proxy_pass $target;
+}
+
+location /api/products/ {
+    set $target http://product-service:8000;
+    proxy_pass $target;
+}
+
+location /api/categories/ {
+    set $target http://product-service:8000;
+    proxy_pass $target;
+}
+
+location /api/cart/ {
+    set $target http://order-service:8000;
+    proxy_pass $target;
+}
+
+location /api/saved/ {
+    set $target http://order-service:8000;
+    proxy_pass $target;
+}
+
+location /api/compare/ {
+    set $target http://order-service:8000;
+    proxy_pass $target;
+}
+
+location /api/checkout/ {
+    set $target http://order-service:8000;
+    proxy_pass $target;
+}
+
+location /api/orders/ {
+    set $target http://order-service:8000;
+    proxy_pass $target;
+}
+
+location /api/staff/orders/ {
+    set $target http://order-service:8000;
+    proxy_pass $target;
+}
+
+location /api/analytics/ {
+    set $target http://order-service:8000;
+    proxy_pass $target;
+}
+
+location /api/internal/ {
+    set $target http://order-service:8000;
+    proxy_pass $target;
+}
+
+location /api/payments/ {
+    set $target http://payment-service:8000;
+    proxy_pass $target;
+}
+
+location /api/shipments/ {
+    set $target http://shipping-service:8000;
+    proxy_pass $target;
+}
+
+location /api/chat/ {
+    set $target http://chatbot-service:8000;
+    proxy_pass $target;
+}
+\end{lstlisting}
+
+\subsection{Authentication and Authorization}
+
+The system keeps two auth surfaces:
+
+\begin{itemize}
+    \item Django session authentication for browser UI routes under \codepath{/customer/*}, \codepath{/staff/*}, and \codepath{/admin/}.
+    \item JWT API authentication for \codepath{/api/auth/register/}, \codepath{/api/auth/token/}, \codepath{/api/auth/token/refresh/}, and \codepath{/api/auth/me/}.
+\end{itemize}
+
+Internal APIs in \codepath{order\_service}, \codepath{payment\_service}, and \codepath{shipping\_service} validate service keys such as \codepath{ORDER\_SERVICE\_INTERNAL\_KEY}, \codepath{PAYMENT\_SERVICE\_INTERNAL\_KEY}, and \codepath{SHIPPING\_SERVICE\_INTERNAL\_KEY}.
+
+\subsection{Communication Between Services}
+
+The system uses synchronous REST. For example, \codepath{order\_service/orders/service\_clients.py} calls the payment service and shipping service through environment-driven URLs.
+
+\begin{lstlisting}[language=Python,caption={Real internal service call pattern.}]
+def create_pending_payment(order):
+    return _request_json(
+        "POST",
+        f"{_payment_service_url()}/api/payments/",
+        payload={
+            "order_id": order.id,
+            "user_id": order.user_id,
+            "amount": order.total_amount,
+            "status": "pending",
+        },
+        headers=_payment_headers(),
+    )
+\end{lstlisting}
+
+\subsection{Docker Compose Deployment}
+
+\begin{lstlisting}[caption={Real Docker Compose service excerpt.}]
+gateway:
+  image: nginx:1.27-alpine
+  volumes:
+    - ./docker/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+  ports:
+    - "8080:80"
+
+product_service:
+  build: ./services/product_service
+  hostname: product-service
+  ports:
+    - "8001:8000"
+
+order_service:
+  build: ./services/order_service
+  hostname: order-service
+  environment:
+    PAYMENT_SERVICE_URL: http://payment-service:8000
+    SHIPPING_SERVICE_URL: http://shipping-service:8000
+\end{lstlisting}
+
+\subsection{End-to-End Checkout Flow}
 
 \begin{enumerate}[label=\arabic*.]
-    \item Receive a message, current product context, user context, user reference, and recommendation limit.
-    \item Record a behavior event in PostgreSQL.
-    \item Predict user behavior signal using \texttt{model\_best} when available, otherwise use heuristic history and priors.
-    \item Detect preferred categories from the question, current product, and behavior signal.
-    \item Query Neo4j for graph context when available.
-    \item Retrieve RAG documents from the file knowledge base.
-    \item Rank live catalog products from \texttt{product\_service}.
-    \item Build a prompt with user profile, dominant category, RAG documents, and recommendation candidates.
-    \item Call the configured LLM provider.
-    \item Sanitize the answer and return answer text, recommendations, citations, source, fallback status, and error code.
+    \item Customer submits checkout from \codepath{/customer/checkout/}.
+    \item Nginx routes browser traffic to \codepath{user\_service}.
+    \item \codepath{user\_service} signs and forwards checkout payload to \codepath{order\_service}.
+    \item \codepath{order\_service} creates \codepath{Order}, \codepath{OrderItem}, and \codepath{OrderShipping} records.
+    \item \codepath{order\_service} creates a pending payment in \codepath{payment\_service}.
+    \item \codepath{order\_service} creates a pending shipment in \codepath{shipping\_service}.
+    \item Payment confirmation updates payment status and order payment snapshot.
+    \item Staff shipping update calls \codepath{shipping\_service} and synchronizes the current order shipping snapshot.
 \end{enumerate}
 
 \begin{figure}[H]
-    \centering
-    \safeincludegraphics[width=0.65\linewidth]{EssayV1/chat_widget.png}
-    \caption{Customer-facing chatbot widget connected to the hybrid AI service.}
-    \label{fig:chat-widget}
+\centering
+\includegraphics[width=0.98\linewidth]{final_diagram_images/ecom_checkout_sequence.png}
+\caption{End-to-end checkout sequence for the real system.}
+\label{fig:ecom-checkout-sequence}
 \end{figure}
 
-\section{Security and Communication Design}
+\subsection{Run and Verification Plan}
 
-\subsection{Authentication Surfaces}
+The practical verification commands are:
 
-The project keeps browser authentication and API authentication separate. Customer and staff UI pages use Django sessions. JWT is used for API authentication through the auth endpoints in \texttt{user\_service}. The JWT payload includes user identity, role, scopes, staff flag, and superuser flag. This coexistence is appropriate for a demo system because browser flows remain ergonomic while API flows can be tested independently.
+\begin{lstlisting}[caption={System run and smoke-check commands.}]
+docker compose config --quiet
+docker compose up --build -d
+docker compose ps
+Invoke-WebRequest http://localhost:8080/customer/login/
+Invoke-WebRequest http://localhost:8080/api/categories/
+Invoke-WebRequest http://localhost:8080/api/chat/reply/ -Method Post `
+  -ContentType 'application/json' -Body '{"message":"goi y laptop hoc tap"}'
+\end{lstlisting}
 
-\subsection{Internal Service Authorization}
+Relevant service tests should be run with \codepath{python manage.py test} in each touched service when service code changes. This essay update changes documentation and generated diagram artifacts only, so the most important checks are LaTeX compilation and Docker/gateway smoke checks.
 
-Internal endpoints in \texttt{order\_service} require a shared internal key passed through headers such as \texttt{X-Internal-Key}. Payment and shipping services use similar internal key concepts. This is not a complete zero-trust production security model, but it is a reasonable educational boundary because it prevents public callers from directly using internal operational endpoints without the expected key.
+\subsection{System Evaluation}
 
-\subsection{Fault Handling}
+\subsubsection{Advantages}
 
-Distributed systems fail partially. The order service handles downstream failures from payment and shipping services using \texttt{DownstreamServiceError}. The chatbot service also handles missing LLM keys, blocked keys, rate limits, network errors, unavailable Neo4j, and missing model artifacts. These fallback branches are significant because they keep the user-facing system responsive even when advanced dependencies are missing.
+\begin{itemize}
+    \item The API Gateway hides internal service URLs and keeps \codepath{8080} as the public entrypoint.
+    \item Product, order, payment, shipping, user, and chatbot responsibilities are separated by business capability.
+    \item MySQL and PostgreSQL are selected service by service instead of forcing one database for the whole project.
+    \item AI dependencies and artifacts stay isolated in \codepath{chatbot\_service}.
+\end{itemize}
 
-\section{Deployment Design}
+\subsubsection{Remaining Risks}
 
-\subsection{Docker Compose}
+\begin{itemize}
+    \item The system still uses synchronous REST calls, so checkout depends on downstream payment and shipping service availability.
+    \item There is no distributed tracing stack yet, so multi-service debugging still depends on container logs.
+    \item Cart is a logical bounded capability inside \codepath{order\_service}, not an independently scalable container.
+    \item LLM calls require external API keys; fallback behavior is implemented, but generated answer quality depends on runtime configuration.
+\end{itemize}
 
-The system is deployed locally through Docker Compose. MySQL and PostgreSQL services have health checks. Application services depend on the relevant database health checks or service-started conditions. The chatbot service mounts the artifacts directory so that generated knowledge bases, model files, metrics, and runtime configuration persist on the host. Neo4j exposes ports 7474 and 7687 for browser and Bolt access.
+\subsection{Conclusion}
 
-\subsection{Environment-driven Configuration}
+The complete system satisfies the core microservice evidence required by the report: real Docker Compose deployment, Nginx gateway routing, database-per-service design, Django models and APIs per service, checkout orchestration, and a working AI consultation service integrated into the e-commerce flow.
 
-Runtime URLs and credentials are controlled through environment variables. Examples include \texttt{PRODUCT\_SERVICE\_URL}, \texttt{ORDER\_SERVICE\_URL}, \texttt{PAYMENT\_SERVICE\_URL}, \texttt{SHIPPING\_SERVICE\_URL}, \texttt{CHATBOT\_SERVICE\_URL}, \texttt{NEO4J\_URI}, \texttt{NEO4J\_USERNAME}, \texttt{NEO4J\_PASSWORD}, and \texttt{NEO4J\_DATABASE}. This keeps service code portable across local Docker Compose and future deployment environments.
+\section*{Final Conclusion}
+\addcontentsline{toc}{section}{Final Conclusion}
 
-\section{End-to-End Workflow}
+This essay follows the lecturer's structure: it first explains monolithic architecture, microservices, and DDD; then it develops the real e-commerce microservice design from the current repository; then it presents the AI service for product consultation; and finally it describes the complete system architecture, gateway, security, communication, Docker deployment, workflow, and evaluation.
 
-\subsection{Shopping and Checkout Flow}
+The healthcare system appears only as the case study in Section 1.4 for practicing DDD decomposition. The main project remains the e-commerce microservices system with AI recommendation and chatbot consultation.
 
-The customer shopping flow begins at the gateway. The customer opens the dashboard, and Nginx routes the browser request to \texttt{user\_service}. The user service fetches categories and products from \texttt{product\_service}. When the customer adds an item to cart, the user service sends a product snapshot to \texttt{order\_service}. During checkout, the order service creates the order and item snapshots, creates a payment record in \texttt{payment\_service}, creates a shipment record in \texttt{shipping\_service}, clears the cart, and returns the order to the user service. Payment confirmation later calls the payment service and updates the order snapshot.
-
-\begin{figure}[H]
-    \centering
-    \safeincludegraphics[width=0.98\linewidth]{EssayV1/checkout_sequence.png}
-    \caption{End-to-end checkout and AI recommendation sequence.}
-    \label{fig:checkout-sequence}
-\end{figure}
-
-\subsection{AI-assisted Browsing Flow}
-
-The AI flow is integrated into the same customer journey. On the dashboard, the user service builds an AI question from the current search filters and visible products. On the cart page, it builds a buy-together question from cart item names and categories. In the chat widget, the customer provides a direct natural-language question. In all cases, the user service sends a structured payload to the chatbot service and receives answer text, recommendation cards, citations, fallback metadata, and provider metadata.
-
-\section{Evaluation and Discussion}
-
-\subsection{Strengths}
-
-The most important strength of this system is boundary clarity. The six application services map to understandable business capabilities. Databases are service-local, and the order service uses snapshots instead of cross-service database joins. The Nginx gateway offers a simple public entry point while retaining direct debug ports for development. The AI service is integrated into customer workflows without forcing AI concerns into product, order, payment, or shipping services.
-
-The second strength is graceful degradation. The chatbot can fall back from LLM calls to catalog recommendations. Neo4j is optional. Model artifacts are used when present and bypassed when unavailable. This is appropriate for educational architecture because it demonstrates that AI-enhanced systems should still remain operational when the AI layer is partially unavailable.
-
-The third strength is migration awareness. Legacy user mapping, legacy order import, and chatbot behavior backfill show that the architecture considers recovery and cutover rather than only greenfield design.
-
-\subsection{Limitations}
-
-The main limitation is synchronous coupling during checkout. The order service directly calls payment and shipping services in the request path. This is easier to reason about for a Version 1 demo, but a production system would usually introduce asynchronous events, idempotency keys, retries, and outbox patterns to reduce failure coupling.
-
-Another limitation is simplified security. Internal keys are useful for a local demo, but production deployment would require stronger service identity, secret management, network policies, rate limiting, audit logging, and centralized observability. Similarly, JWT validation is present for API auth, but service-to-service trust is still simplified.
-
-The AI evaluation also has limitations. The reported model metrics are very high, which suggests the generated dataset may be clean and strongly patterned. For production use, the model should be evaluated on noisier real behavior, cold-start users, multilingual queries, out-of-stock products, and adversarial prompts. The current RAG scoring is token-based rather than embedding-based, which is acceptable for Version 1 but limited for semantic search.
-
-\subsection{Future Improvements}
-
-Future versions can improve the architecture in five directions. First, checkout should move toward event-driven orchestration using an outbox and message broker. Second, observability should be added through structured logs, distributed traces, and service-level metrics. Third, the AI service can replace token retrieval with embeddings and a vector index. Fourth, security can be strengthened with service identity, scoped tokens, and secret rotation. Fifth, the deployment architecture can be prepared for Kubernetes by adding readiness probes, resource limits, and separate production settings.
-
-\section{Conclusion}
-
-This report analyzed a Django-based e-commerce system using microservices, DDD, Docker Compose, Nginx, database-per-service persistence, and AI-assisted shopping. The implementation demonstrates a practical transition from monolithic thinking to bounded-context thinking. The catalog, commerce, payment, shipping, identity, and AI assistant contexts have distinct ownership and communicate through explicit APIs. The order service preserves historical product snapshots, payment snapshots, and shipping snapshots for UI compatibility while delegating payment and shipping records to dedicated services.
-
-The AI service adds a modern layer to the commerce experience. It records behavior events, uses model artifacts for category-affinity prediction, retrieves product and FAQ context through RAG, optionally queries Neo4j for graph context, and returns customer-facing recommendations through dashboard, cart, and chat interfaces. The architecture is not production-complete, but it is coherent for an academic Version 1 submission because it shows service decomposition, database ownership, gateway routing, security boundaries, deployment wiring, and AI integration in a working source-code project.
-
-\newpage
 \section*{References}
 \addcontentsline{toc}{section}{References}
 
-\begin{thebibliography}{9}
+\begin{enumerate}[label={[\arabic*]}]
+    \item E. Evans, \textit{Domain-Driven Design: Tackling Complexity in the Heart of Software}. Addison-Wesley, 2003.
+    \item S. Newman, \textit{Building Microservices: Designing Fine-Grained Systems}, 2nd ed. O'Reilly Media, 2021.
+    \item M. Fowler and J. Lewis, ``Microservices: a definition of this new architectural term,'' 2014.
+    \item C. Richardson, \textit{Microservices Patterns}. Manning Publications, 2018.
+    \item Django Software Foundation, ``Django Documentation.'' Official documentation.
+    \item Django REST Framework, ``Django REST Framework Documentation.'' Official documentation.
+    \item Neo4j, ``Neo4j Graph Database Documentation.'' Official documentation.
+    \item scikit-learn developers, ``scikit-learn Documentation.'' Official documentation.
+\end{enumerate}
 
-\bibitem{evans2003ddd}
-E. Evans, \textit{Domain-Driven Design: Tackling Complexity in the Heart of Software}. Addison-Wesley, 2003.
-
-\bibitem{newman2021}
-S. Newman, \textit{Building Microservices: Designing Fine-Grained Systems}, 2nd ed. O'Reilly Media, 2021.
-
-\bibitem{fowler2014}
-M. Fowler and J. Lewis, ``Microservices: a definition of this new architectural term,'' 2014.
-
-\bibitem{richardson2018}
-C. Richardson, \textit{Microservices Patterns: With examples in Java}. Manning Publications, 2018.
-
-\bibitem{nginx}
-Nginx, ``NGINX Reverse Proxy Documentation.'' Official documentation.
-
-\bibitem{django}
-Django Software Foundation, ``Django Documentation.'' Official documentation.
-
-\bibitem{neo4j}
-Neo4j, ``Neo4j Graph Database Documentation.'' Official documentation.
-
-\bibitem{rag}
-P. Lewis et al., ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' 2020.
-
-\end{thebibliography}
-
-\newpage
 \appendix
-\section{Overleaf Image Upload Checklist}
 
-Upload the following files into an Overleaf folder named \texttt{EssayV1}. The LaTeX file already references them with the same relative paths.
+\section{Implementation Evidence Used}
 
-\begin{longtable}{p{0.34\linewidth}p{0.56\linewidth}}
-\caption{Images required by the report.}
-\label{tab:image-checklist}\\
-\toprule
-\textbf{File name in Overleaf} & \textbf{Purpose in the essay}\\
-\midrule
-\endfirsthead
-\toprule
-\textbf{File name in Overleaf} & \textbf{Purpose in the essay}\\
-\midrule
-\endhead
-\texttt{EssayV1/system\_architecture.png} & Overall six-service architecture with Nginx gateway.\\
-\texttt{EssayV1/ddd\_context\_map.png} & DDD bounded context map.\\
-\texttt{EssayV1/database\_mapping.png} & Database-per-service mapping.\\
-\texttt{EssayV1/checkout\_sequence.png} & Checkout and AI recommendation sequence.\\
-\texttt{EssayV1/dashboard\_ai.png} & Dashboard AI suggestion evidence.\\
-\texttt{EssayV1/cart\_ai.png} & Cart buy-together AI suggestion evidence.\\
-\texttt{EssayV1/chat\_widget.png} & Floating chatbot widget evidence.\\
-\texttt{EssayV1/confusion\_matrix\_rnn.png} & Confusion matrix for selected RNN behavior model.\\
-\texttt{EssayV1/history\_rnn.png} & Training history for selected RNN behavior model.\\
-\texttt{EssayV1/neo4j\_browser.png} & Neo4j behavior graph evidence.\\
-\texttt{EssayV1/neo4j\_browser\_detail.png} & Additional Neo4j query/detail evidence.\\
-\bottomrule
-\end{longtable}
+This appendix records the concrete project evidence used to replace the earlier generic examples:
 
-\section{Suggested Verification Commands}
+\begin{itemize}
+    \item Root folder: \codepath{c:/Users/nguye/Desktop/kiemtra01}.
+    \item Runtime configuration: \codepath{docker-compose.yml}.
+    \item Gateway routing: \codepath{docker/gateway/nginx.conf}.
+    \item Product model/API/seed data: \codepath{services/product\_service/catalog/models.py}, \codepath{urls.py}, \codepath{seed\_data.py}.
+    \item User auth and UI routes: \codepath{services/user\_service/customer/api\_auth.py}, \codepath{customer/urls.py}, \codepath{staff/urls.py}.
+    \item Commerce state: \codepath{services/order\_service/orders/models.py}, \codepath{urls.py}, \codepath{service\_clients.py}.
+    \item Payment and shipping lifecycle: \codepath{services/payment\_service/payments/models.py}, \codepath{services/shipping\_service/shipments/models.py}.
+    \item AI service: \codepath{services/chatbot\_service/chatbot/models.py}, \codepath{services.py}, \codepath{behavior\_ai.py}, \codepath{behavior\_graph.py}, \codepath{rag\_kb.py}.
+    \item AI artifacts and screenshots: \codepath{services/chatbot\_service/chatbot/artifacts/} and \codepath{docs/evidence/screenshots/}.
+    \item Final report diagrams: \codepath{EssayV1/final\_diagram\_images/}. PNG diagrams are generated by \codepath{EssayV1/generate\_ecom\_diagrams.py}; detailed class and data-model diagrams are exported from Visual Paradigm as SVG files.
+\end{itemize}
 
-The following commands are suitable for local evidence collection before exporting the final PDF:
+\clearpage
+\section{Classmate Review Table}
 
-\begin{lstlisting}
-docker compose config --quiet
-docker compose up --build -d
-docker compose ps -a
-docker compose logs --tail=120 gateway user_service order_service payment_service shipping_service product_service chatbot_service
-docker compose exec product_service python manage.py seed_products --reset
-docker compose exec chatbot_service python manage.py build_chat_kb --max-products 160
-docker compose exec chatbot_service python manage.py train_behavior_model
-docker compose exec chatbot_service python manage.py import_behavior_graph --reset
-\end{lstlisting}
+This table is prepared for classmates to review the report during the final classroom discussion.
+
+\begin{table}[H]
+\centering
+\caption{Classmate review table.}
+\label{tab:classmate-review}
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|L{0.14\linewidth}|C{0.12\linewidth}|L{0.52\linewidth}|C{0.07\linewidth}|C{0.07\linewidth}|}
+\hline
+\textbf{Name} & \textbf{ID} & \centering\arraybackslash\textbf{Assessment Notes} & \textbf{Score} & \textbf{Sign.}\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\rule{0pt}{2.05cm} & & & &\\
+\hline
+\end{tabular}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1}
+\normalsize
+\end{table}
 
 \end{document}
