@@ -8,3 +8,13 @@ __pycache__/
 .DS_Store
 mysql_data/
 postgres_data/
+.chrome-headless*/
+EssayV1/build/
+*.aux
+*.log
+*.toc
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.xdv
