@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
@@ -14,6 +14,28 @@ from .models import LegacyUserMapping
 from .services import add_to_cart, fetch_products, request_chatbot_reply
 
 User = get_user_model()
+
+
+def _csrf_token_from_response(response):
+    html = response.content.decode("utf-8")
+    marker = 'name="csrfmiddlewaretoken" value="'
+    start = html.find(marker)
+    if start == -1:
+        return ""
+    start += len(marker)
+    end = html.find('"', start)
+    return html[start:end]
+
+
+def _html_attribute_from_response(response, attribute_name):
+    html = response.content.decode("utf-8")
+    marker = f'{attribute_name}="'
+    start = html.find(marker)
+    if start == -1:
+        return ""
+    start += len(marker)
+    end = html.find('"', start)
+    return html[start:end]
 
 
 class LegacyUserMergeTests(TestCase):
@@ -227,6 +249,74 @@ class SharedAuthFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         list_orders_mock.assert_called_once_with(customer.id)
+
+    def test_staff_login_does_not_invalidate_customer_pay_order_csrf(self):
+        customer = User.objects.create_user(
+            username="buyer-pay",
+            email="buyer-pay@example.com",
+            password="pass12345",
+        )
+        staff = User.objects.create_user(
+            username="ops-pay",
+            email="ops-pay@example.com",
+            password="pass12345",
+        )
+        staff.is_staff = True
+        staff.save(update_fields=["is_staff"])
+
+        client = Client(enforce_csrf_checks=True)
+        customer_login_page = client.get(reverse("customer_login"))
+        customer_login_token = _csrf_token_from_response(customer_login_page)
+        customer_response = client.post(
+            reverse("customer_login"),
+            {
+                "username": customer.username,
+                "password": "pass12345",
+                "csrfmiddlewaretoken": customer_login_token,
+            },
+        )
+        self.assertEqual(customer_response.status_code, 302)
+
+        orders = [
+            {
+                "id": 139,
+                "created_at": "2026-04-27T17:41:59+07:00",
+                "payment_status": "pending",
+                "shipping_status": "pending",
+                "total_amount": "188.00",
+                "shipping": {},
+                "items": [],
+            }
+        ]
+        with patch("customer.views.fetch_categories", return_value=[]), patch(
+            "customer.views.list_orders",
+            return_value=orders,
+        ):
+            orders_page = client.get(reverse("customer_orders"))
+        order_pay_token = _csrf_token_from_response(orders_page)
+        self.assertTrue(order_pay_token)
+
+        staff_login_page = client.get(reverse("staff_login"))
+        staff_login_token = _csrf_token_from_response(staff_login_page)
+        staff_response = client.post(
+            reverse("staff_login"),
+            {
+                "username": staff.username,
+                "password": "pass12345",
+                "csrfmiddlewaretoken": staff_login_token,
+            },
+        )
+        self.assertEqual(staff_response.status_code, 302)
+
+        with patch("customer.views.pay_order", return_value=(True, {"id": 139}, None)) as pay_order_mock:
+            pay_response = client.post(
+                reverse("customer_pay_order", args=[139]),
+                {"csrfmiddlewaretoken": order_pay_token},
+            )
+
+        self.assertEqual(pay_response.status_code, 302)
+        self.assertEqual(pay_response["Location"], reverse("customer_orders"))
+        pay_order_mock.assert_called_once_with(customer.id, 139)
 
 
 class JwtAuthApiTests(TestCase):
@@ -527,6 +617,62 @@ class CustomerGatewayFlowTests(TestCase):
         self.assertEqual(payload["recommendations"][0]["category_slug"], "smartphones")
         self.assertEqual(payload["recommendations"][0]["url"], "/customer/products/smartphones/42/")
         self.assertEqual(payload["citations"][0]["label"], "Behavior graph")
+
+    def test_chatbot_proxy_accepts_widget_csrf_token_after_session_scoping(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+
+        product = {
+            "service": "tablets",
+            "category_slug": "tablets",
+            "category_name": "Tablets",
+            "id": 55,
+            "name": "Slate Pro 11",
+            "description": "Tablet for note-taking.",
+            "image_url": "https://example.com/tablet.jpg",
+            "brand": "Apple",
+            "price": "899.00",
+            "stock": 5,
+        }
+        with patch("customer.views.fetch_categories", return_value=[]), patch(
+            "customer.views.fetch_category_lookup",
+            return_value={"tablets": {"hero_image_url": "https://example.com/tablets-hero.jpg"}},
+        ), patch("customer.views.fetch_product_detail", return_value=product), patch(
+            "customer.views.recommend_products_for_detail",
+            return_value=[],
+        ), patch("customer.views.list_cart_items", return_value=[]), patch(
+            "customer.views.list_saved_items",
+            return_value=[],
+        ), patch("customer.views.list_compare_items", return_value=[]):
+            page_response = client.get(reverse("customer_product_detail", args=["tablets", 55]))
+
+        csrf_token = _html_attribute_from_response(page_response, "data-csrf-token")
+        self.assertTrue(csrf_token)
+
+        with patch(
+            "customer.views.request_chatbot_reply",
+            return_value={
+                "answer": "Hybrid chatbot reply.",
+                "recommendations": [],
+                "citations": [],
+                "source": "gemma_4_31b",
+                "fallback_used": False,
+                "error_code": None,
+                "provider": None,
+            },
+        ), patch(
+            "customer.views.build_user_context_payload",
+            return_value={"cart_items": [], "saved_items": [], "recent_paid_items": []},
+        ):
+            response = client.post(
+                reverse("customer_chatbot_reply"),
+                '{"message":"Need a tablet recommendation."}',
+                content_type="application/json",
+                HTTP_X_CSRFTOKEN=csrf_token,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["answer"], "Hybrid chatbot reply.")
 
     def test_request_chatbot_reply_sanitizes_decimal_price_before_json_post(self):
         fake_response = type(

@@ -27,6 +27,7 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
+CSRF_USE_SESSIONS = True
 
 
 # Application definition

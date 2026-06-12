@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "generated_at_utc": "2026-06-11T09:32:13.676019+00:00",
+  "generated_at_utc": "2026-06-11T18:17:37.427988+00:00",
   "categories": [
     {
       "slug": "business-laptops",
@@ -44,13 +44,438 @@
     }
   ],
   "source_stats": {
-    "samples": 1400,
-    "distinct_users": 1400,
-    "total_events": 1400,
+    "samples": 1425,
+    "distinct_users": 1425,
+    "total_events": 1425,
     "category_count": 10,
     "loss": null
   },
   "samples": [
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "64",
+      "event_count": 29,
+      "category_affinity": {
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "62",
+      "event_count": 12,
+      "category_affinity": {
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
+        "smartwatches": 0.0,
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "62",
+      "event_count": 12,
+      "category_affinity": {
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
+        "smartwatches": 0.0,
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "62",
+      "event_count": 12,
+      "category_affinity": {
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
+        "smartwatches": 0.0,
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "62",
+      "event_count": 12,
+      "category_affinity": {
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
+        "smartwatches": 0.0,
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "61",
+      "event_count": 4,
+      "category_affinity": {
+        "business-laptops": 0.0877,
+        "gaming-laptops": 0.0877,
+        "ultrabooks": 0.0877,
+        "smartphones": 0.0,
+        "tablets": 0.1754,
+        "smartwatches": 0.0,
+        "audio": 0.0,
+        "keyboards-mice": 0.0,
+        "chargers-cables": 0.0877,
+        "bags-stands": 0.4737
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "61",
+      "event_count": 4,
+      "category_affinity": {
+        "business-laptops": 0.0877,
+        "gaming-laptops": 0.0877,
+        "ultrabooks": 0.0877,
+        "smartphones": 0.0,
+        "tablets": 0.1754,
+        "smartwatches": 0.0,
+        "audio": 0.0,
+        "keyboards-mice": 0.0,
+        "chargers-cables": 0.0877,
+        "bags-stands": 0.4737
+      },
+      "dominant_category_slug": "bags-stands"
+    },
+    {
+      "user_ref": "61",
+      "event_count": 4,
+      "category_affinity": {
+        "business-laptops": 0.0877,
+        "gaming-laptops": 0.0877,
+        "ultrabooks": 0.0877,
+        "smartphones": 0.0,
+        "tablets": 0.1754,
+        "smartwatches": 0.0,
+        "audio": 0.0,
+        "keyboards-mice": 0.0,
+        "chargers-cables": 0.0877,
+        "bags-stands": 0.4737
+      },
+      "dominant_category_slug": "bags-stands"
+    },
     {
       "user_ref": "4",
       "event_count": 16,
@@ -1090,20 +1515,20 @@
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "52",
@@ -4388,71 +4813,71 @@
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "135",
@@ -7873,20 +8298,20 @@
     },
     {
       "user_ref": "62",
-      "event_count": 8,
+      "event_count": 12,
       "category_affinity": {
-        "business-laptops": 0.1875,
-        "gaming-laptops": 0.1875,
-        "ultrabooks": 0.1875,
-        "smartphones": 0.1875,
-        "tablets": 0.0,
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
         "smartwatches": 0.0,
-        "audio": 0.0625,
-        "keyboards-mice": 0.0625,
-        "chargers-cables": 0.0625,
-        "bags-stands": 0.0625
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "25",
@@ -10100,20 +10525,20 @@
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "125",
@@ -11749,37 +12174,37 @@
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "13",
@@ -11834,20 +12259,20 @@
     },
     {
       "user_ref": "61",
-      "event_count": 1,
+      "event_count": 4,
       "category_affinity": {
-        "business-laptops": 0.0,
-        "gaming-laptops": 0.0,
-        "ultrabooks": 0.0,
+        "business-laptops": 0.0877,
+        "gaming-laptops": 0.0877,
+        "ultrabooks": 0.0877,
         "smartphones": 0.0,
-        "tablets": 0.0,
+        "tablets": 0.1754,
         "smartwatches": 0.0,
         "audio": 0.0,
         "keyboards-mice": 0.0,
-        "chargers-cables": 1.0,
-        "bags-stands": 0.0
+        "chargers-cables": 0.0877,
+        "bags-stands": 0.4737
       },
-      "dominant_category_slug": "chargers-cables"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "58",
@@ -14214,54 +14639,54 @@
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "64",
-      "event_count": 11,
+      "event_count": 29,
       "category_affinity": {
-        "business-laptops": 0.1695,
-        "gaming-laptops": 0.1695,
-        "ultrabooks": 0.1695,
-        "smartphones": 0.1525,
-        "tablets": 0.0339,
-        "smartwatches": 0.0339,
-        "audio": 0.0678,
-        "keyboards-mice": 0.0678,
-        "chargers-cables": 0.0678,
-        "bags-stands": 0.0678
+        "business-laptops": 0.0847,
+        "gaming-laptops": 0.0847,
+        "ultrabooks": 0.0847,
+        "smartphones": 0.113,
+        "tablets": 0.0847,
+        "smartwatches": 0.0141,
+        "audio": 0.2175,
+        "keyboards-mice": 0.0282,
+        "chargers-cables": 0.0282,
+        "bags-stands": 0.2599
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "108",
@@ -16509,71 +16934,71 @@
     },
     {
       "user_ref": "62",
-      "event_count": 8,
+      "event_count": 12,
       "category_affinity": {
-        "business-laptops": 0.1875,
-        "gaming-laptops": 0.1875,
-        "ultrabooks": 0.1875,
-        "smartphones": 0.1875,
-        "tablets": 0.0,
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
         "smartwatches": 0.0,
-        "audio": 0.0625,
-        "keyboards-mice": 0.0625,
-        "chargers-cables": 0.0625,
-        "bags-stands": 0.0625
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "62",
-      "event_count": 8,
+      "event_count": 12,
       "category_affinity": {
-        "business-laptops": 0.1875,
-        "gaming-laptops": 0.1875,
-        "ultrabooks": 0.1875,
-        "smartphones": 0.1875,
-        "tablets": 0.0,
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
         "smartwatches": 0.0,
-        "audio": 0.0625,
-        "keyboards-mice": 0.0625,
-        "chargers-cables": 0.0625,
-        "bags-stands": 0.0625
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "62",
-      "event_count": 8,
+      "event_count": 12,
       "category_affinity": {
-        "business-laptops": 0.1875,
-        "gaming-laptops": 0.1875,
-        "ultrabooks": 0.1875,
-        "smartphones": 0.1875,
-        "tablets": 0.0,
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
         "smartwatches": 0.0,
-        "audio": 0.0625,
-        "keyboards-mice": 0.0625,
-        "chargers-cables": 0.0625,
-        "bags-stands": 0.0625
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "62",
-      "event_count": 8,
+      "event_count": 12,
       "category_affinity": {
-        "business-laptops": 0.1875,
-        "gaming-laptops": 0.1875,
-        "ultrabooks": 0.1875,
-        "smartphones": 0.1875,
-        "tablets": 0.0,
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
         "smartwatches": 0.0,
-        "audio": 0.0625,
-        "keyboards-mice": 0.0625,
-        "chargers-cables": 0.0625,
-        "bags-stands": 0.0625
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "44",
@@ -23037,54 +23462,54 @@
     },
     {
       "user_ref": "62",
-      "event_count": 8,
+      "event_count": 12,
       "category_affinity": {
-        "business-laptops": 0.1875,
-        "gaming-laptops": 0.1875,
-        "ultrabooks": 0.1875,
-        "smartphones": 0.1875,
-        "tablets": 0.0,
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
         "smartwatches": 0.0,
-        "audio": 0.0625,
-        "keyboards-mice": 0.0625,
-        "chargers-cables": 0.0625,
-        "bags-stands": 0.0625
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "62",
-      "event_count": 8,
+      "event_count": 12,
       "category_affinity": {
-        "business-laptops": 0.1875,
-        "gaming-laptops": 0.1875,
-        "ultrabooks": 0.1875,
-        "smartphones": 0.1875,
-        "tablets": 0.0,
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
         "smartwatches": 0.0,
-        "audio": 0.0625,
-        "keyboards-mice": 0.0625,
-        "chargers-cables": 0.0625,
-        "bags-stands": 0.0625
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "62",
-      "event_count": 8,
+      "event_count": 12,
       "category_affinity": {
-        "business-laptops": 0.1875,
-        "gaming-laptops": 0.1875,
-        "ultrabooks": 0.1875,
-        "smartphones": 0.1875,
-        "tablets": 0.0,
+        "business-laptops": 0.1701,
+        "gaming-laptops": 0.1701,
+        "ultrabooks": 0.1701,
+        "smartphones": 0.102,
+        "tablets": 0.068,
         "smartwatches": 0.0,
-        "audio": 0.0625,
-        "keyboards-mice": 0.0625,
-        "chargers-cables": 0.0625,
-        "bags-stands": 0.0625
+        "audio": 0.034,
+        "keyboards-mice": 0.034,
+        "chargers-cables": 0.034,
+        "bags-stands": 0.2177
       },
-      "dominant_category_slug": "business-laptops"
+      "dominant_category_slug": "bags-stands"
     },
     {
       "user_ref": "104",

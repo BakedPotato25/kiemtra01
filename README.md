@@ -147,20 +147,20 @@ Important variables:
 
 ## 5. Runbook
 
-If Docker Desktop or the Docker service is not running, start Docker first, then run the same commands below. On Windows PowerShell, useful recovery commands are:
+If Docker Desktop or the Docker service is not running, start Docker first, then run the same commands below. On Windows PowerShell, useful quick-start commands are:
 
 ```powershell
 Start-Service -Name com.docker.service
 docker compose config --quiet
-docker compose up --build -d
+docker compose up -d
 docker compose ps -a
 docker compose logs --tail=120 gateway user_service order_service payment_service shipping_service product_service chatbot_service
 ```
 
-Start everything:
+Start everything quickly when images and volumes already exist:
 
 ```bash
-docker compose up --build -d
+docker compose up -d
 ```
 
 Check containers:
@@ -170,11 +170,32 @@ docker compose ps
 docker compose logs --tail=120 user_service order_service payment_service shipping_service product_service chatbot_service
 ```
 
+Only rebuild when containers fail to start, images are missing/stale, or Dockerfiles/requirements changed:
+
+```bash
+docker compose up --build -d
+```
+
 Stop:
 
 ```bash
 docker compose down
 ```
+
+Quick demo URLs:
+
+- Customer login: `http://localhost:8080/customer/login/`
+- Staff login: `http://localhost:8080/staff/login/`
+- Gateway dashboard: `http://localhost:8080/gateway/`
+- Neo4j Browser: `http://localhost:7474/`
+
+Quick demo accounts:
+
+| Page | Username | Password | Notes |
+|---|---|---|---|
+| Customer | `demo_customer` | `DemoPass123!` | Fixed customer account for live customer flow. |
+| Customer history data | `demo_customer_001` to `demo_customer_012` | `demo12345` | Synthetic customers with order history from `seed_staff_demo_data --customers 12`. |
+| Staff | `demo_staff` | `StaffPass123!` | Fixed staff account for staff dashboard/orders. |
 
 ## 6. Migrations And Seed
 
@@ -194,6 +215,36 @@ Seed catalog + editorial content:
 ```bash
 docker compose exec product_service python manage.py seed_products --reset
 docker compose exec user_service python manage.py seed_editorial_content --reset
+```
+
+Create or update fixed demo login accounts:
+
+```powershell
+$createDemoAccounts = @'
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+accounts = [
+    ("demo_customer", "demo_customer@example.test", "DemoPass123!", False),
+    ("demo_staff", "demo_staff@example.test", "StaffPass123!", True),
+]
+for username, email, password, is_staff in accounts:
+    user, _ = User.objects.get_or_create(username=username, defaults={"email": email})
+    user.email = email
+    user.is_staff = is_staff
+    user.is_superuser = False
+    user.is_active = True
+    user.set_password(password)
+    user.save()
+print("ready: demo_customer / demo_staff")
+'@
+docker compose exec -T user_service python manage.py shell -c "$createDemoAccounts"
+```
+
+Create synthetic customers and order history for staff demo pages:
+
+```bash
+docker compose exec user_service python manage.py seed_staff_demo_data --customers 12 --min-orders 1 --max-orders 2
 ```
 
 Build chatbot artifacts:
@@ -236,7 +287,7 @@ docker compose exec user_service python manage.py backfill_chatbot_behavior
 
 ## 8. Verification Checklist
 
-- `docker compose up --build -d` reaches a clean state with:
+- `docker compose up -d` reaches a clean state with existing images and volumes. Use `docker compose up --build -d` only if the quick start fails or build inputs changed.
   - MySQL healthy before `user_service` and `order_service` bootstrap/migrate
   - PostgreSQL healthy before `product_service`, `payment_service`, `shipping_service`, and `chatbot_service` bootstrap/migrate
 - Customer register/login works.
@@ -339,8 +390,8 @@ The final demo keeps the customer routes stable and shows the e-commerce UI with
 
 Recommended live demo order:
 
-1. Start the full stack with `docker compose up --build -d`.
-2. Open `http://localhost:8080/customer/register/` and create a customer account, or sign in with an existing seeded/demo account.
+1. Start the full stack with `docker compose up -d`. Rebuild with `docker compose up --build -d` only if startup fails or Docker image inputs changed.
+2. Open `http://localhost:8080/customer/login/` and sign in with `demo_customer` / `DemoPass123!`, or create a new customer at `/customer/register/`.
 3. Browse `http://localhost:8080/customer/dashboard/`, search by keyword/category, and capture the AI recommendation block together with the matching product results.
 4. Add 1-2 items to cart, open `http://localhost:8080/customer/cart/`, and capture the buy-together recommendation block.
 5. Open the existing chat widget, ask for a product suggestion, and capture the widget reply with recommendation cards/citations.

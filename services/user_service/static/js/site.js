@@ -7,7 +7,12 @@
     }
   };
 
-  const getCsrfToken = () => {
+  const getCsrfToken = (sourceElement) => {
+    const elementToken = sourceElement ? sourceElement.getAttribute("data-csrf-token") : "";
+    if (elementToken && elementToken !== "NOTPROVIDED") {
+      return elementToken;
+    }
+
     const cookie = document.cookie || "";
     const parts = cookie.split(";").map((item) => item.trim());
     const tokenPair = parts.find((item) => item.startsWith("csrftoken="));
@@ -172,9 +177,6 @@
     if (!widgets.length) {
       return;
     }
-
-    const csrfToken = getCsrfToken();
-
     widgets.forEach((widget) => {
       const shell = widget.closest("[data-assist-shell]");
       const toggleButton = shell ? shell.querySelector("[data-assist-toggle]") : null;
@@ -187,6 +189,7 @@
       const sendButton = widget.querySelector("[data-assist-send]");
       const quickButtons = Array.from(widget.querySelectorAll("[data-assist-quick]"));
       const storageKey = widget.getAttribute("data-assist-storage-key") || "assist-history:user-anon";
+      const csrfToken = getCsrfToken(widget);
       const maxHistoryItems = 60;
       const initialLogMarkup = log ? log.innerHTML : "";
       let historyItems = loadConversationHistory(storageKey);

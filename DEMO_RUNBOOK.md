@@ -6,6 +6,73 @@ File nay dung de mo app nhanh truoc khi demo va bao cao tren truong. Cac lenh be
 cd C:\Users\nguye\Desktop\kiemtra01
 ```
 
+## 0. Quick Start Cho Demo Tinh Nang
+
+Neu database va artifacts da seed tu lan truoc, start nhanh bang:
+
+```powershell
+docker compose config --quiet
+docker compose up -d
+docker compose ps -a
+```
+
+Sau do mo:
+
+- Customer UI: `http://localhost:8080/customer/login/`
+- Staff UI: `http://localhost:8080/staff/login/`
+- Gateway dashboard: `http://localhost:8080/gateway/`
+- Neo4j Browser: `http://localhost:7474/`
+
+Login nhanh:
+
+| Page | URL | Username | Password | Ghi chu |
+|---|---|---|---|---|
+| Customer | `http://localhost:8080/customer/login/` | `demo_customer` | `DemoPass123!` | Account customer chinh. |
+| Customer | `http://localhost:8080/customer/login/` | `demo_customer_001` den `demo_customer_012` | `demo12345` | Synthetic customer co san order history cho staff demo. |
+| Staff | `http://localhost:8080/staff/login/` | `demo_staff` | `StaffPass123!` | Account staff chinh. |
+
+Neu demo tren database moi hoac muon refresh day du du lieu demo, chay block nay. Van dung `up -d`; chi doi sang `up --build -d` khi container loi, image thieu/cu, hoac vua doi Dockerfile/requirements:
+
+```powershell
+docker compose up -d
+
+docker compose exec -T product_service python manage.py seed_products
+docker compose exec -T user_service python manage.py seed_editorial_content
+
+$createDemoAccounts = @'
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+accounts = [
+    ("demo_customer", "demo_customer@example.test", "DemoPass123!", False),
+    ("demo_staff", "demo_staff@example.test", "StaffPass123!", True),
+]
+for username, email, password, is_staff in accounts:
+    user, _ = User.objects.get_or_create(username=username, defaults={"email": email})
+    user.email = email
+    user.is_staff = is_staff
+    user.is_superuser = False
+    user.is_active = True
+    user.set_password(password)
+    user.save()
+print("ready: demo_customer / demo_staff")
+'@
+docker compose exec -T user_service python manage.py shell -c "$createDemoAccounts"
+
+docker compose exec -T user_service python manage.py seed_staff_demo_data --customers 12 --min-orders 1 --max-orders 2
+docker compose exec -T chatbot_service python manage.py build_chat_kb --max-products 160
+docker compose exec -T chatbot_service python manage.py train_behavior_model
+docker compose exec -T chatbot_service python manage.py import_behavior_graph --reset
+```
+
+Login nhanh sau khi chay block tren:
+
+| Page | URL | Username | Password | Ghi chu |
+|---|---|---|---|---|
+| Customer | `http://localhost:8080/customer/login/` | `demo_customer` | `DemoPass123!` | Customer flow chinh luc demo. |
+| Customer | `http://localhost:8080/customer/login/` | `demo_customer_001` den `demo_customer_012` | `demo12345` | Co order history de staff xem customers/orders. |
+| Staff | `http://localhost:8080/staff/login/` | `demo_staff` | `StaffPass123!` | Staff dashboard/orders/items. |
+
 ## 1. Kiem Tra Truoc Khi Chay
 
 Mo Docker Desktop truoc. Cho Docker bao dang chay on dinh, sau do kiem tra:
@@ -29,7 +96,13 @@ Khong can tao service `api_gateway` rieng. Gateway hien tai gom:
 
 ## 2. Khoi Chay Full Stack
 
-Chay toan bo service:
+Chay toan bo service nhanh, khong build lai image:
+
+```powershell
+docker compose up -d
+```
+
+Chi build lai khi quick start loi, image thieu/cu, hoac vua sua Dockerfile/requirements:
 
 ```powershell
 docker compose up --build -d
@@ -78,6 +151,36 @@ Seed blog/testimonial cho customer UI:
 
 ```powershell
 docker compose exec -T user_service python manage.py seed_editorial_content
+```
+
+Tao/cap nhat account demo co dinh cho customer page va staff page:
+
+```powershell
+$createDemoAccounts = @'
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+accounts = [
+    ("demo_customer", "demo_customer@example.test", "DemoPass123!", False),
+    ("demo_staff", "demo_staff@example.test", "StaffPass123!", True),
+]
+for username, email, password, is_staff in accounts:
+    user, _ = User.objects.get_or_create(username=username, defaults={"email": email})
+    user.email = email
+    user.is_staff = is_staff
+    user.is_superuser = False
+    user.is_active = True
+    user.set_password(password)
+    user.save()
+print("ready: demo_customer / demo_staff")
+'@
+docker compose exec -T user_service python manage.py shell -c "$createDemoAccounts"
+```
+
+Tao synthetic customer va order history cho staff Customers/Orders pages:
+
+```powershell
+docker compose exec -T user_service python manage.py seed_staff_demo_data --customers 12 --min-orders 1 --max-orders 2
 ```
 
 Build chatbot knowledge base:
@@ -256,13 +359,13 @@ Chi dung cac URL nay khi gateway `8080` co van de hoac can debug service rieng:
    - `/api/products/`, `/api/categories/` di vao `product_service`.
    - `/api/cart/`, `/api/checkout/`, `/api/orders/` di vao `order_service`.
    - Payment/shipping/chat di vao service rieng.
-3. Mo `http://localhost:8080/customer/register/` va tao customer demo.
+3. Mo `http://localhost:8080/customer/login/` va login bang `demo_customer` / `DemoPass123!`.
 4. Vao `customer/dashboard`, xem categories/products va block AI recommendation.
 5. Them san pham vao cart.
 6. Vao `customer/cart`, xem cart va goi y AI mua kem.
 7. Checkout voi shipping info.
 8. Vao `customer/orders`, bam pay order.
-9. Mo `staff/register/` hoac `staff/login/`, vao `staff/orders`.
+9. Mo `staff/login/` va login bang `demo_staff` / `StaffPass123!`, vao `staff/orders`.
 10. Cap nhat shipping status: `preparing`, `shipped`, `delivered`.
 11. Quay lai `customer/orders` de thay trang thai don hang da doi.
 12. Mo chatbot widget va hoi: `Goi y laptop hoc tap`.
@@ -270,29 +373,49 @@ Chi dung cac URL nay khi gateway `8080` co van de hoac can debug service rieng:
 
 ## 7. Tai Khoan Demo
 
-Ban co the tao account moi truc tiep trong UI.
+Tat ca account ben duoi dung qua gateway `http://localhost:8080`. Customer account chi login o customer page; staff account chi login o staff page. Superuser/admin account khong login o staff page, ma dung `/admin/`.
 
-Customer:
+### 7.1 Customer Page
+
+Login URL: `http://localhost:8080/customer/login/`
+
+| Username | Password | Ghi chu |
+|---|---|---|
+| `demo_customer` | `DemoPass123!` | Account customer co dinh tao/cap nhat bang block Quick Start. |
+| `demo_customer_001` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_002` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_003` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_004` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_005` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_006` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_007` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_008` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_009` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_010` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_011` | `demo12345` | Synthetic customer co order history cho staff demo. |
+| `demo_customer_012` | `demo12345` | Synthetic customer co order history cho staff demo. |
+
+Neu chay `seed_staff_demo_data --customers N`, command se tao username tu `demo_customer_001` den `demo_customer_NNN`. Password mac dinh cho synthetic customer moi tao la `demo12345`.
+
+Ban van co the tao customer moi truc tiep o:
 
 - URL: `http://localhost:8080/customer/register/`
 - Password demo nen dung: `DemoPass123!`
 
-Staff:
+Smoke check API auth o section 4 tao them account dang `demo_<timestamp>` voi password `DemoPass123!`; account nay la customer account, nhung username thay doi moi lan chay.
+
+### 7.2 Staff Page
+
+Login URL: `http://localhost:8080/staff/login/`
+
+| Username | Password | Ghi chu |
+|---|---|---|
+| `demo_staff` | `StaffPass123!` | Account staff co dinh tao/cap nhat bang block Quick Start. |
+
+Ban van co the tao staff moi truc tiep o:
 
 - URL: `http://localhost:8080/staff/register/`
 - Password demo nen dung: `StaffPass123!`
-
-Neu dung synthetic staff data:
-
-```powershell
-docker compose exec -T user_service python manage.py seed_staff_demo_data --customers 12 --min-orders 1 --max-orders 2
-```
-
-Synthetic customer password mac dinh trong command la:
-
-```text
-demo12345
-```
 
 ## 8. Kiem Tra Test Truoc Bao Cao
 
@@ -344,6 +467,12 @@ Vi du:
 docker compose logs --tail=160 user_service
 docker compose logs --tail=160 order_service
 docker compose logs --tail=160 chatbot_service
+```
+
+Neu container loi vi image cu hoac dependency thay doi:
+
+```powershell
+docker compose up --build -d
 ```
 
 Neu chatbot tra fallback hoac khong co goi y:

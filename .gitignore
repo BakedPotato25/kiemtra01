@@ -18,3 +18,4 @@ EssayV1/build/
 *.fls
 *.fdb_latexmk
 *.xdv
+.env.example

@@ -10,6 +10,7 @@
     data-assist-panel-root
     data-chat-endpoint="/customer/chatbot/reply/"
     data-assist-storage-key="assist-history:user-{{ request.user.id|default:'anon' }}"
+    data-csrf-token="{{ csrf_token }}"
     {% if chatbot_current_product %}
     data-category-slug="{{ chatbot_current_product.category_slug|default:chatbot_current_product.service }}"
     data-category-name="{{ chatbot_current_product.category_name }}"

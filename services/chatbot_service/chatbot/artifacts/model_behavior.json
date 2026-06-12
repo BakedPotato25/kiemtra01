@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "generated_at_utc": "2026-06-11T09:32:13.672202+00:00",
+  "generated_at_utc": "2026-06-11T18:17:37.423693+00:00",
   "categories": [
     {
       "slug": "business-laptops",
@@ -44,21 +44,21 @@
     }
   ],
   "priors": {
-    "business-laptops": 0.0662,
-    "gaming-laptops": 0.0647,
+    "business-laptops": 0.0666,
+    "gaming-laptops": 0.0651,
     "ultrabooks": 0.079,
-    "smartphones": 0.1009,
-    "tablets": 0.1159,
+    "smartphones": 0.1008,
+    "tablets": 0.1154,
     "smartwatches": 0.0096,
-    "audio": 0.0756,
-    "keyboards-mice": 0.0615,
-    "chargers-cables": 0.0814,
-    "bags-stands": 0.345
+    "audio": 0.0794,
+    "keyboards-mice": 0.0604,
+    "chargers-cables": 0.0798,
+    "bags-stands": 0.3438
   },
   "metrics": {
-    "samples": 1400,
-    "distinct_users": 1400,
-    "total_events": 1400,
+    "samples": 1425,
+    "distinct_users": 1425,
+    "total_events": 1425,
     "category_count": 10,
     "loss": null
   }
